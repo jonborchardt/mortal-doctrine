@@ -26,14 +26,14 @@ future milestones, not yet built). Decision records live in [decisions/](decisio
 
 ## Layers — Implemented (enforced)
 
-| #   | Layer          | Contains                                                        | Today                              |
-| --- | -------------- | --------------------------------------------------------------- | ---------------------------------- |
-| 1   | `foundation`   | math primitives, narrowly scoped shared contracts               | `sim-core`, `math`                 |
-| 2   | `simulation`   | headless gameplay: state, stepping, movement, collision, combat | `simulation`, `commands`, `replay` |
-| 3   | `animation`    | presentation-independent skeleton and animation evaluation      | `rig`, `animation`                 |
-| 4   | `presentation` | rendering, effects, camera, audio, browser device adapters      | `renderer`, `input`                |
-| 5   | `content`      | `characters/*`, `arenas/*`                                      | —                                  |
-| 6   | `application`  | `apps/*` composition and tooling                                | `game`, `studio`                   |
+| #   | Layer          | Contains                                                        | Today                                    |
+| --- | -------------- | --------------------------------------------------------------- | ---------------------------------------- |
+| 1   | `foundation`   | math primitives, narrowly scoped shared contracts               | `sim-core`, `math`                       |
+| 2   | `simulation`   | headless gameplay: state, stepping, movement, collision, combat | `simulation`, `commands`, `replay`       |
+| 3   | `animation`    | presentation-independent skeleton and animation evaluation      | `rig`, `animation`                       |
+| 4   | `presentation` | rendering, effects, camera, audio, browser device adapters      | `renderer`, `skeleton-renderer`, `input` |
+| 5   | `content`      | `characters/*`, `arenas/*`                                      | —                                        |
+| 6   | `application`  | `apps/*` composition and tooling                                | `game`, `studio`                         |
 
 A package declares its layer in `package.json`:
 
@@ -280,6 +280,12 @@ and never mutates simulation state. Other presentation packages extend it withou
 - **Host loop:** `startHostLoop` owns renderer + runner + frame subscription for the game and
   the Simulation Lab (the Replay, Command and Input Labs keep their own setup).
 
+`@mortal-doctrine/skeleton-renderer` is the first such package: a registered renderable that
+draws a rig with one sprite per attachment-bearing slot. The caller supplies the pose, facing and
+character origin each frame; the renderable evaluates the rig, orders the slots, and places each
+texture (id = attachment id) with a Pixi-free transform function. It owns the textures it is
+given and releases them on `destroy`.
+
 The 960×540 viewport and the 2× texture resolution are **defaults, not architectural
 constraints**. No code may assume the logical viewport equals the arena width.
 
@@ -293,7 +299,8 @@ transform can be evaluated deterministically; skeletal rendering is a separate p
 concern (see Layers). Visual animation never determines combat timing; move frame data does.
 
 **Implemented:** rigs and pose evaluation (`rig`); keyframed clips, sampling, blending and the pose
-pipeline (`animation`). IK, mesh deformation and skeletal rendering are not.
+pipeline (`animation`); skeletal rendering of evaluated rigs (`skeleton-renderer`, presentation
+layer). IK and mesh deformation are not.
 
 ## Studio — Implemented (convention), Intended (labs)
 

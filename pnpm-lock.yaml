@@ -288,6 +288,9 @@ importers:
       '@mortal-doctrine/simulation':
         specifier: workspace:*
         version: link:../../packages/simulation
+      '@mortal-doctrine/skeleton-renderer':
+        specifier: workspace:*
+        version: link:../../packages/skeleton-renderer
       pixi.js:
         specifier: ^8.23.0
         version: 8.23.0
@@ -438,6 +441,31 @@ importers:
         specifier: ^4.6.7
         version: 4.6.7
     devDependencies:
+      vitest:
+        specifier: ^5.1.2
+        version: 5.1.2(@types/node@24.19.4)(vite@8.3.8(@types/node@24.19.4)(jiti@2.7.0))
+
+  packages/skeleton-renderer:
+    dependencies:
+      '@mortal-doctrine/animation':
+        specifier: workspace:*
+        version: link:../animation
+      '@mortal-doctrine/math':
+        specifier: workspace:*
+        version: link:../math
+      '@mortal-doctrine/renderer':
+        specifier: workspace:*
+        version: link:../renderer
+      '@mortal-doctrine/rig':
+        specifier: workspace:*
+        version: link:../rig
+      pixi.js:
+        specifier: ^8.23.0
+        version: 8.23.0
+    devDependencies:
+      '@mortal-doctrine/simulation':
+        specifier: workspace:*
+        version: link:../simulation
       vitest:
         specifier: ^5.1.2
         version: 5.1.2(@types/node@24.19.4)(vite@8.3.8(@types/node@24.19.4)(jiti@2.7.0))

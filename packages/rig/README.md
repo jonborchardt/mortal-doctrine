@@ -127,6 +127,5 @@ slots.map((slot) => slot.attachment); // ['tail-plain', 'body-plain', null, 'sta
 ## Integration
 
 - **Consumers today:** the Studio Skeleton Lab (`/labs/skeleton`), which draws the result with a
-  lab-local SVG debug view.
-- **Later:** animation evaluation (M1.08) produces `Pose` values; skeletal rendering (M1.10)
-  draws `slots` in order at their transforms.
+  lab-local SVG debug view; `@mortal-doctrine/animation`, which produces `Pose` values; and
+  `@mortal-doctrine/skeleton-renderer`, which draws `slots` in order at their transforms.
