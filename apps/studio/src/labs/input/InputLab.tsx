@@ -179,7 +179,7 @@ function sampleTick(session: Session, tick: number): FrameInputs {
     const tapped = latched & ~held;
     if (tapped) {
       session.taps.push(`tick ${tick}: P${player + 1} ${formatFrame(tapped)}`);
-      session.taps.splice(0, Math.max(0, session.taps.length - TAPS_KEPT));
+      if (session.taps.length > TAPS_KEPT) session.taps.shift();
     }
     return capture.sample();
   };

@@ -98,7 +98,7 @@ export interface InputSources {
 }
 
 /** The real browser devices. */
-export function browserInputSources(): InputSources {
+function browserInputSources(): InputSources {
   return { window, document, getGamepads: () => navigator.getGamepads() };
 }
 

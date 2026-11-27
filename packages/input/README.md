@@ -21,7 +21,7 @@ touch, rumble, right stick, analog triggers, `preventDefault` / page-scroll supp
 | `GamepadBindings`                        | Every `InputBitName` → button indices, plus `stick` axis indices and `deadzone`                                 |
 | `DEFAULT_PLAYER_BINDINGS`                | `[player 1, player 2]` defaults (below)                                                                         |
 | `DEFAULT_GAMEPAD_BINDINGS`               | Standard-mapping pad defaults (below)                                                                           |
-| `InputSources`, `browserInputSources()`  | Where device state comes from: `window`, `document`, `getGamepads()`. Defaults to the browser; inject for tests |
+| `InputSources`                           | Where device state comes from: `window`, `document`, `getGamepads()`. Defaults to the browser; inject for tests |
 | `GamepadLike`, `InputDiagnostics`        | The subset of `Gamepad` that is read; the shape `inspect()` returns                                             |
 
 ### Sampling
