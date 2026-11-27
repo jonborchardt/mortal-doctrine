@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@mortal-doctrine/commands": "workspace:*",
+    "@mortal-doctrine/movement": "workspace:*",
     "@mortal-doctrine/sim-core": "workspace:*",
     "zod": "^4.6.7"
   },

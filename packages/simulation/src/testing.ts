@@ -18,9 +18,10 @@ export const P1_LEFT: FrameInputs = [InputBit.LEFT, 0];
 export const SEEDED_OPTIONS: InitialStateOptions = { seed: 0x9e37_79b9, historyCapacity: 8 };
 
 /**
- * 90-frame cycle. Player one walks right 40 frames, idles 10, walks left 40. Player two walks
- * right 60 frames (reaching the right edge every cycle, so `boundary-contact` events occur),
- * holds left + right for 10 (no movement) and walks left 20; it presses A1 every third frame.
+ * 90-frame cycle, left/right only (no jumps, crouches or collisions). Player one walks right 40
+ * frames, idles 10, walks left 40. Player two walks right 60 frames (reaching the right wall
+ * every cycle, so `wall-contact` events occur), holds left + right for 10 (no movement) and
+ * walks left 20; it presses A1 every third frame.
  */
 export const walkCycleScript: InputProvider = (frame) => {
   const phase = frame % 90;

@@ -106,6 +106,11 @@ Character APIs do not exist yet (M2–M3). The fixed parts:
 - The Command Lab (`/labs/commands`) plays a scripted fixture (or live input) through `step` with
   the generic commands and shows the frame, each player's facing and input timeline, and the
   recognized commands with frame numbers. Pause and Step make single ticks observable.
+- The Movement Lab (`/labs/movement`) plays a movement scenario (`MOVEMENT_SCENARIOS`) with a
+  chosen placeholder parameter set through production `step`, paused at frame 0. An SVG view
+  draws both pushboxes (resizing when crouching or airborne) and each fighter's trajectory;
+  readouts show the frame and each fighter's x, y, vx, vy, facing and state, plus the movement
+  event log. Play/Pause, Step and Reset; live input is not supported yet.
 - Diagnostics are measured by the host app around simulation calls; the simulation itself never
   reads clocks.
 - `pnpm bench` runs headless Vitest benchmarks (`tests/*.bench.ts`). Compare results only on the
