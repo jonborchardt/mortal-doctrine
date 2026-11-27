@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "textures": {
+    "sky": "textures/sky@2x.png",
+    "far-tower": "textures/far-tower@2x.png",
+    "mid-block": "textures/mid-block@2x.png",
+    "ground": "textures/ground@2x.png",
+    "ground-post": "textures/ground-post@2x.png"
+  }
+}

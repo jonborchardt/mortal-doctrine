@@ -117,6 +117,11 @@ Character APIs do not exist yet (M2–M3). The fixed parts:
   change the constraint data. The SVG view draws the limit arcs; readouts show the target, the
   end effector, its distance from the shoulder against full reach, and each limited bone's
   rotation.
+- The Arena Lab (`/labs/arena`) draws `PLACEHOLDER_ARENA` with the production arena renderable
+  (renderer placeholders off), paused at frame 0. Pan (Left / Hold / Right) makes both fighters
+  walk through production `step`; the production camera frames them. Play/Pause, Step, Reset and
+  one visibility toggle per arena layer; readouts show the frame, the visible span and the
+  fighters' midpoint.
 - Diagnostics are measured by the host app around simulation calls; the simulation itself never
   reads clocks.
 - `pnpm bench` runs headless Vitest benchmarks (`tests/*.bench.ts`). Compare results only on the
