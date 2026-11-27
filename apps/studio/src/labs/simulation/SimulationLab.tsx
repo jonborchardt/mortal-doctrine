@@ -1,13 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { createKeyboardInput, type KeyboardInput } from '@mortal-doctrine/input';
-import { createArenaRenderer } from '@mortal-doctrine/renderer';
 import {
-  InputBit,
-  NEUTRAL_INPUT,
-  TICK_RATE,
-  type FrameInputs,
-  type InputFrame,
-} from '@mortal-doctrine/sim-core';
+  createInputCapture,
+  DEFAULT_PLAYER_BINDINGS,
+  type InputCapture,
+} from '@mortal-doctrine/input';
+import { createArenaRenderer } from '@mortal-doctrine/renderer';
+import { InputBit, TICK_RATE, type FrameInputs, type InputFrame } from '@mortal-doctrine/sim-core';
 import {
   createSimulationRunner,
   type InitialStateOptions,
@@ -22,7 +20,7 @@ const EVENTS_KEPT = 50;
 
 interface Session {
   readonly runner: SimulationRunner;
-  readonly keyboard: KeyboardInput;
+  readonly players: readonly [InputCapture, InputCapture];
   /** Recent events, oldest first (shown newest first). Mutated by the loop and controls, never React state. */
   readonly log: SimulationEvent[];
 }
@@ -50,8 +48,11 @@ export function SimulationLab() {
       .then((renderer) => {
         if (disposed) return renderer.destroy();
         const runner = createSimulationRunner(LAB_OPTIONS);
-        const keyboard = createKeyboardInput(window);
-        const session: Session = { runner, keyboard, log: [] };
+        const players = [
+          createInputCapture(DEFAULT_PLAYER_BINDINGS[0]),
+          createInputCapture(DEFAULT_PLAYER_BINDINGS[1]),
+        ] as const;
+        const session: Session = { runner, players, log: [] };
         sessionRef.current = session;
         const readouts = new Map(
           [...root.querySelectorAll<HTMLElement>('[data-readout]')].map((el) => [
@@ -69,7 +70,7 @@ export function SimulationLab() {
         // Per-frame work stays outside React; React only handles control clicks.
         const unsubscribe = renderer.onFrame((elapsedMs) => {
           const started = performance.now();
-          const { ticks, events } = runner.advance(elapsedMs, () => inputsFrom(keyboard));
+          const { ticks, events } = runner.advance(elapsedMs, () => sample(players));
           const simMs = performance.now() - started;
           record(session, events);
           renderer.render(runner.state);
@@ -107,7 +108,7 @@ export function SimulationLab() {
         setReady(true);
         teardown = () => {
           unsubscribe();
-          keyboard.dispose();
+          for (const player of players) player.dispose();
           renderer.destroy();
           sessionRef.current = null;
         };
@@ -140,7 +141,7 @@ export function SimulationLab() {
     control((session) =>
       record(
         session,
-        session.runner.stepOnce(() => inputsFrom(session.keyboard)),
+        session.runner.stepOnce(() => sample(session.players)),
       ),
     );
   const reset = () =>
@@ -231,16 +232,18 @@ export function SimulationLab() {
         </section>
       </div>
       <p className="text-sm text-neutral-400">
-        Player 1: ← → or A / D (↑ ↓ or W / S and buttons U I O J K L are recorded only). Step uses
-        held keys.
+        Player 1: ← → or A / D (↑ ↓ or W / S and buttons U I O J K L are recorded only). Player 2:
+        numpad 4 / 6 or the first gamepad. Step uses held keys plus any key tapped since the last
+        tick.
       </p>
       {error && <p className="text-red-400">Renderer failed: {error}</p>}
     </section>
   );
 }
 
-function inputsFrom(keyboard: KeyboardInput): FrameInputs {
-  return [keyboard.read(), NEUTRAL_INPUT];
+/** One sample per player per tick: held inputs plus presses latched since the previous tick. */
+function sample(players: Session['players']): FrameInputs {
+  return [players[0].sample(), players[1].sample()];
 }
 
 function record(session: Session, events: readonly SimulationEvent[]) {

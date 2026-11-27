@@ -79,6 +79,24 @@ test('step applies held keyboard input to player one', async ({ page }) => {
   await expect(page.getByTestId('sim-state')).toContainText('"x": 24400');
 });
 
+test('a key tapped between ticks is applied to exactly one step', async ({ page }) => {
+  await page.goto(SIMULATION_LAB);
+  await pausedAt(page);
+  await page.getByRole('button', { name: 'Reset' }).click();
+  const state = page.getByTestId('sim-state');
+  const frame = page.getByTestId('sim-frame');
+  await expect(state).toContainText('"x": 24000');
+
+  await page.keyboard.down('KeyD');
+  await page.keyboard.up('KeyD');
+  await page.getByRole('button', { name: 'Step' }).click();
+  await expect(frame).toHaveText('1');
+  await expect(state).toContainText('"x": 24400');
+  await page.getByRole('button', { name: 'Step' }).click();
+  await expect(frame).toHaveText('2');
+  await expect(state).toContainText('"x": 24400');
+});
+
 test('shows seed, RNG state, raw input history and boundary-contact events; Reset clears them', async ({
   page,
 }) => {
