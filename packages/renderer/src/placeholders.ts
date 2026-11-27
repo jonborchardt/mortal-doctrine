@@ -2,7 +2,7 @@ import { Container, Graphics } from 'pixi.js';
 import { SUBUNITS_PER_UNIT } from '@mortal-doctrine/sim-core';
 import { FIGHTER_WIDTH } from '@mortal-doctrine/simulation';
 import type { Renderable } from './renderer';
-import { blendFighterX, defaultView, worldToScreen } from './view';
+import { blendFighterX, worldToScreen } from './view';
 
 // Presentation-only sizes in world units: these never feed back into the simulation.
 const FIGHTER_HEIGHT = 140;
@@ -13,7 +13,6 @@ const FIGHTER_COLORS = [0xe0533d, 0x3d8fe0] as const;
 export function createPlaceholderFloor(width: number, height: number): Renderable {
   // Drawn down to the bottom edge from any ground line; the canvas clips the excess.
   const floor = new Graphics().rect(0, 0, width, height).fill(FLOOR_COLOR);
-  floor.y = defaultView(width, height).originY;
   return {
     layer: 'background',
     container: floor,

@@ -20,7 +20,7 @@ skeletal drawing, effects, arena art and HUD belong to later packages, which reg
 | -------------- | -------------------------------------------------- | ---------------------------------------------------------------------------- |
 | `width`        | `960`                                              | Logical viewport width = canvas `width` attribute (CSS-scaled to host width) |
 | `height`       | `540`                                              | Logical viewport height                                                      |
-| `layers`       | `['background', 'fighters', 'effects', 'overlay']` | Unique layer names, **bottom first**: later layers draw over earlier ones    |
+| `layers`       | `['background', 'fighters', 'effects', 'overlay']` | Layer names, **bottom first**: later layers draw over earlier ones           |
 | `placeholders` | `true`                                             | Registers the placeholder floor (`background`) and fighters (`fighters`)     |
 
 The canvas backing store is always 1× (no device-pixel-ratio handling); the viewport is fixed
@@ -31,7 +31,7 @@ of the world origin. World space is y-up in simulation sub-units; screen space i
 logical pixels. `defaultView(width, height)` frames 960 world units across the viewport with the
 ground line 80 world units above the bottom edge (at 960×540: 1 unit = 1 px, ground line y 460).
 `worldToScreen(view, x, y)` maps sub-units to logical pixels. `renderer.setView(view)` is the
-camera hook; `renderer.view` is the current view.
+camera hook.
 
 ## Renderables
 
@@ -93,7 +93,7 @@ loop.destroy(); // destroys every registered renderable, the Pixi app and the ca
 
 Other exports: `ArenaRenderer.onFrame(cb)` (display-frame callback, returns unsubscribe), `fps`,
 `frameCpuMs` (CPU ms of the previous frame: callbacks + scene + draw submission, no GPU time),
-`width`, `height`, `destroy()`.
+`destroy()`.
 
 ## Tests
 

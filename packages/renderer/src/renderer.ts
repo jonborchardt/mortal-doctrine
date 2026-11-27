@@ -39,8 +39,6 @@ export interface Renderable {
 }
 
 export interface ArenaRenderer {
-  readonly width: number;
-  readonly height: number;
   /**
    * Draws a simulation snapshot by updating every registered renderable. Read-only with respect
    * to the snapshot. `previous`, `alpha` and `events` default to none, 0 and none.
@@ -49,8 +47,6 @@ export interface ArenaRenderer {
     state: SimulationState,
     extra?: Partial<Pick<RenderFrame, 'previous' | 'alpha' | 'events'>>,
   ): void;
-  /** Current world → screen mapping. */
-  readonly view: View;
   /** Camera hook: replaces the world → screen mapping from the next drawn frame. */
   setView(view: View): void;
   /** Mounts `renderable` in its layer. Returns an idempotent unregister (which calls `destroy`). */
@@ -80,9 +76,6 @@ export async function createArenaRenderer(
     placeholders = true,
   }: ArenaRendererOptions = {},
 ): Promise<ArenaRenderer> {
-  if (new Set(layers).size !== layers.length) {
-    throw new Error(`Renderer layers must be unique: ${layers.join(', ')}`);
-  }
   const unknownLayer = (name: string) =>
     new Error(`Unknown renderer layer "${name}"; layers are: ${layers.join(', ')}`);
   // Checked before creating the app so a bad option cannot leak a canvas.
@@ -120,8 +113,6 @@ export async function createArenaRenderer(
   };
 
   const renderer: ArenaRenderer = {
-    width,
-    height,
     render(state, extra = {}) {
       const frame: RenderFrame = {
         state,
@@ -131,9 +122,6 @@ export async function createArenaRenderer(
         view,
       };
       for (const renderable of mounted) renderable.update(frame);
-    },
-    get view() {
-      return view;
     },
     setView(next) {
       view = next;
