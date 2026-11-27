@@ -40,6 +40,12 @@ export const frameInputsSchema = z.tuple([inputFrameSchema, inputFrameSchema]).r
 
 /** Returns `value` as `FrameInputs` or throws a descriptive error naming the failing entry. */
 export function parseFrameInputs(value: unknown): FrameInputs {
+  // Per-tick hot path: plain checks equivalent to the schema; Zod only builds the error.
+  const isFrame = (frame: unknown) =>
+    Number.isInteger(frame) && (frame as number) >= 0 && (frame as number) <= ALL_BITS;
+  if (Array.isArray(value) && value.length === 2 && isFrame(value[0]) && isFrame(value[1])) {
+    return value as unknown as FrameInputs;
+  }
   const result = frameInputsSchema.safeParse(value);
   if (result.success) return result.data;
   const problems = result.error.issues.map(
