@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@mortal-doctrine/animation": "workspace:*",
+    "@mortal-doctrine/commands": "workspace:*",
     "@mortal-doctrine/input": "workspace:*",
     "@mortal-doctrine/math": "workspace:*",
     "@mortal-doctrine/renderer": "workspace:*",

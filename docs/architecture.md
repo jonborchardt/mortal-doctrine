@@ -26,14 +26,14 @@ future milestones, not yet built). Decision records live in [decisions/](decisio
 
 ## Layers — Implemented (enforced)
 
-| #   | Layer          | Contains                                                        | Today                  |
-| --- | -------------- | --------------------------------------------------------------- | ---------------------- |
-| 1   | `foundation`   | math primitives, narrowly scoped shared contracts               | `sim-core`, `math`     |
-| 2   | `simulation`   | headless gameplay: state, stepping, movement, collision, combat | `simulation`, `replay` |
-| 3   | `animation`    | presentation-independent skeleton and animation evaluation      | `rig`, `animation`     |
-| 4   | `presentation` | rendering, effects, camera, audio, browser device adapters      | `renderer`, `input`    |
-| 5   | `content`      | `characters/*`, `arenas/*`                                      | —                      |
-| 6   | `application`  | `apps/*` composition and tooling                                | `game`, `studio`       |
+| #   | Layer          | Contains                                                        | Today                              |
+| --- | -------------- | --------------------------------------------------------------- | ---------------------------------- |
+| 1   | `foundation`   | math primitives, narrowly scoped shared contracts               | `sim-core`, `math`                 |
+| 2   | `simulation`   | headless gameplay: state, stepping, movement, collision, combat | `simulation`, `commands`, `replay` |
+| 3   | `animation`    | presentation-independent skeleton and animation evaluation      | `rig`, `animation`                 |
+| 4   | `presentation` | rendering, effects, camera, audio, browser device adapters      | `renderer`, `input`                |
+| 5   | `content`      | `characters/*`, `arenas/*`                                      | —                                  |
+| 6   | `application`  | `apps/*` composition and tooling                                | `game`, `studio`                   |
 
 A package declares its layer in `package.json`:
 
@@ -124,15 +124,17 @@ DOM-free `tsconfig` (copy `packages/simulation`); the determinism rules then app
   restored. There is no migration framework until a real migration exists.
 - State is typed `readonly` and treated as immutable: `step` returns a new state. Presentation
   receives the same object as a read-only snapshot.
-- Ownership: `SimulationState` is `{ frame, rng, input, fighters }`. Each slice has one owning
-  module (`packages/simulation/src/rng.ts`, `input.ts`, `fighters.ts`) exporting its Zod schema,
+- Ownership: `SimulationState` is `{ frame, rng, input, fighters, commands }`. Each slice has one
+  owning module (`packages/simulation/src/rng.ts`, `input.ts`, `fighters.ts`; the `commands`
+  slice is owned by `@mortal-doctrine/commands`) exporting its Zod schema,
   its initial value and a pure `(slice, readonlyContext) → { slice, events }` update. No module
   reads or writes another's slice except through the read-only context `step` passes it (the
   processed `frame`, the raw `FrameInputs` and read-only views of other slices). There is no
   registration mechanism or mutation hook: adding a subsystem means one explicit call in `step`
   and one slice in the schema.
-- **Phase order** (also written in `step.ts`): (1) input history append, (2) walk/bounds using
-  the resolved direction, (3) collect events; then `frame + 1`. The `rng` slice has no phase
+- **Phase order** (also written in `step.ts`): (1) input history append, (2) command
+  recognition (facing from start-of-tick x), (3) walk/bounds using the resolved direction,
+  (4) collect events; then `frame + 1`. The `rng` slice has no phase
   yet (no gameplay draws), so `step` leaves it unchanged.
 
 ### Time
@@ -205,18 +207,35 @@ before any other phase so later phases already see the current frame. Capacity i
 when full, the oldest frame is dropped. Serialization round-trips it exactly and rejects a
 history longer than its capacity.
 
-**Charges longer than the history.** Recognizers (M1.03) keep their own derived counters (e.g.
-frames a direction has been held) in their own slice, updated from the current input each
-frame. Charge length is therefore not limited by history capacity.
+**Command recognition (implemented, `@mortal-doctrine/commands`).** Zod-validated definitions
+(motion steps in nine facing-relative directions, optional charge, a press or release trigger
+with a chord window, `maxFrames`) are passed once as `createInitialState({ commands })` and
+stored in the `commands` slice; both players use the same list. Forward/back follow facing,
+which `step` derives from start-of-tick x until real facing exists (M1.05): toward the
+opponent, and on equal x player 0 faces right. A definition may not read more history than
+`historyCapacity`.
+
+**Charges longer than the history.** The `commands` slice keeps per-player, per-definition
+charge counters (consecutive held frames and frames since the charge was last complete),
+updated from the current frame only, so charge length is not limited by history capacity.
 
 ### Simulation events
 
 **Implemented.** `step(state, inputs)` returns `{ state, events }`. Every event extends
 `sim-core`'s `SimulationEventEnvelope` (`{ type, frame }`); `simulation` exports the union
-`SimulationEvent`. Exactly one event exists today:
+`SimulationEvent`. Two events exist today:
 
 ```ts
-type SimulationEvent = {
+type SimulationEvent =
+  | {
+      readonly type: 'command';
+      readonly frame: number;
+      readonly player: 0 | 1;
+      readonly command: string; // the recognized definition's id
+    }
+  | BoundaryContactEvent;
+
+type BoundaryContactEvent = {
   readonly type: 'boundary-contact';
   readonly frame: number; // the frame being processed (the input state's frame)
   readonly player: 0 | 1;
@@ -227,6 +246,9 @@ type SimulationEvent = {
 - Discriminated unions on `type`, plain serializable data, stamped with the processed `frame`.
 - Returned as an ordered array: by phase in the fixed phase order, then by ascending player
   index, then by emission order. All events of a frame are returned; none are merged or dropped.
+  So `command` events come before `boundary-contact` events of the same tick, player 0 before
+  player 1, and within a player in definition list order (the documented command priority;
+  nothing is consumed or suppressed).
 - The array (and each event) is new and frozen every step. Nothing a consumer does with it can
   affect the simulation: the only inputs to `step` are state and `FrameInputs`.
 - The runner's `advance` returns `{ ticks, events }` with events in tick order; `stepOnce`
@@ -264,7 +286,7 @@ pipeline (`animation`). IK, mesh deformation and skeletal rendering are not.
 
 Each lab is a folder `apps/studio/src/labs/<id>/` with a `lab.ts` exporting a typed
 `LabDefinition`; discovery is automatic (`import.meta.glob`). Every lab has the stable URL
-`/labs/<id>`. The Simulation, Input, Replay, Skeleton and Animation Labs exist. See [development.md](development.md#adding-a-studio-lab).
+`/labs/<id>`. The Simulation, Input, Command, Replay, Skeleton and Animation Labs exist. See [development.md](development.md#adding-a-studio-lab).
 
 ## Deferred functionality (explicit non-goals of M0)
 

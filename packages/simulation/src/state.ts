@@ -1,3 +1,9 @@
+import {
+  commandsSliceSchema,
+  createCommandsSlice,
+  requiredHistory,
+  type CommandDefinition,
+} from '@mortal-doctrine/commands';
 import { int32Schema } from '@mortal-doctrine/sim-core';
 import { z } from 'zod';
 import { fightersSliceSchema, initialFighters } from './fighters';
@@ -11,6 +17,18 @@ export const simulationStateSchema = z
     rng: rngSliceSchema,
     input: inputSliceSchema,
     fighters: fightersSliceSchema,
+    commands: commandsSliceSchema,
+  })
+  .superRefine((state, ctx) => {
+    state.commands.definitions.forEach((definition, index) => {
+      if (requiredHistory(definition) > state.input.capacity) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['commands', 'definitions', index],
+          message: `needs ${requiredHistory(definition)} history frames, more than capacity ${state.input.capacity}`,
+        });
+      }
+    });
   })
   .readonly();
 
@@ -21,14 +39,21 @@ export interface InitialStateOptions {
   readonly seed?: number;
   /** Input history frames kept per player, an integer in [1, 600]. Default 60. */
   readonly historyCapacity?: number;
+  /**
+   * Command definitions for both players, in priority order (`@mortal-doctrine/commands`).
+   * Default none. Throws naming the failing path, or if one needs more than `historyCapacity`.
+   */
+  readonly commands?: readonly CommandDefinition[];
 }
 
 export function createInitialState(options: InitialStateOptions = {}): SimulationState {
+  const input = initialInput(options.historyCapacity);
   return {
     frame: 0,
     rng: initialRng(options.seed),
-    input: initialInput(options.historyCapacity),
+    input,
     fighters: initialFighters(),
+    commands: createCommandsSlice(options.commands ?? [], input.capacity),
   };
 }
 

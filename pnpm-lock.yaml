@@ -264,6 +264,9 @@ importers:
       '@mortal-doctrine/animation':
         specifier: workspace:*
         version: link:../../packages/animation
+      '@mortal-doctrine/commands':
+        specifier: workspace:*
+        version: link:../../packages/commands
       '@mortal-doctrine/input':
         specifier: workspace:*
         version: link:../../packages/input
@@ -322,6 +325,19 @@ importers:
       '@mortal-doctrine/rig':
         specifier: workspace:*
         version: link:../rig
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      vitest:
+        specifier: ^5.1.2
+        version: 5.1.2(@types/node@24.19.4)(vite@8.3.8(@types/node@24.19.4)(jiti@2.7.0))
+
+  packages/commands:
+    dependencies:
+      '@mortal-doctrine/sim-core':
+        specifier: workspace:*
+        version: link:../sim-core
       zod:
         specifier: ^4.6.7
         version: 4.6.7
@@ -402,6 +418,9 @@ importers:
 
   packages/simulation:
     dependencies:
+      '@mortal-doctrine/commands':
+        specifier: workspace:*
+        version: link:../commands
       '@mortal-doctrine/sim-core':
         specifier: workspace:*
         version: link:../sim-core
