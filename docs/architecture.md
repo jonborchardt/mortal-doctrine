@@ -30,7 +30,7 @@ future milestones, not yet built). Decision records live in [decisions/](decisio
 | --- | -------------- | --------------------------------------------------------------- | ---------------------- |
 | 1   | `foundation`   | math primitives, narrowly scoped shared contracts               | `sim-core`, `math`     |
 | 2   | `simulation`   | headless gameplay: state, stepping, movement, collision, combat | `simulation`, `replay` |
-| 3   | `animation`    | presentation-independent skeleton and animation evaluation      | —                      |
+| 3   | `animation`    | presentation-independent skeleton and animation evaluation      | `rig`                  |
 | 4   | `presentation` | rendering, effects, camera, audio, browser device adapters      | `renderer`, `input`    |
 | 5   | `content`      | `characters/*`, `arenas/*`                                      | —                      |
 | 6   | `application`  | `apps/*` composition and tooling                                | `game`, `studio`       |
@@ -261,7 +261,7 @@ concern (see Layers). Visual animation never determines combat timing; move fram
 
 Each lab is a folder `apps/studio/src/labs/<id>/` with a `lab.ts` exporting a typed
 `LabDefinition`; discovery is automatic (`import.meta.glob`). Every lab has the stable URL
-`/labs/<id>`. The Simulation, Input and Replay Labs exist. See [development.md](development.md#adding-a-studio-lab).
+`/labs/<id>`. The Simulation, Input, Replay and Skeleton Labs exist. See [development.md](development.md#adding-a-studio-lab).
 
 ## Deferred functionality (explicit non-goals of M0)
 

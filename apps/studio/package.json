@@ -15,8 +15,10 @@
   },
   "dependencies": {
     "@mortal-doctrine/input": "workspace:*",
+    "@mortal-doctrine/math": "workspace:*",
     "@mortal-doctrine/renderer": "workspace:*",
     "@mortal-doctrine/replay": "workspace:*",
+    "@mortal-doctrine/rig": "workspace:*",
     "@mortal-doctrine/sim-core": "workspace:*",
     "@mortal-doctrine/simulation": "workspace:*",
     "react": "^19.3.1",
