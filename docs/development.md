@@ -95,7 +95,10 @@ Character APIs do not exist yet (M2–M3). The fixed parts:
 - The Simulation Lab shows target and measured tick rate, render FPS, simulation update time per
   display frame and frame CPU time (`renderer.frameCpuMs`: callbacks + scene update + draw
   submission; GPU time excluded). It also shows the seed, the RNG state, recent raw input
-  history per player (direction and button glyphs) and an event log with frame numbers. The game
+  history per player (direction and button glyphs) and an event log with frame numbers. Its
+  rendering controls select the viewport (recreating the loop), toggle interpolation (with an
+  alpha readout), register a lab-local fixture renderable in a chosen layer and pick its texture
+  resolution; a readout lists every fixture's update count, destroy count and texture release. The game
   shows frame number, FPS and player one's x in world units.
 - The Input Lab (`/labs/input`) shows, per player, raw device state (held keys, gamepad buttons
   and stick), presses latched for the next tick, the frames sampled each tick, and a log of

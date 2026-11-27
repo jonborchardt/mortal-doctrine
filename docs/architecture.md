@@ -148,8 +148,12 @@ DOM-free `tsconfig` (copy `packages/simulation`); the determinism rules then app
   accumulated time; `stepOnce()` runs exactly one tick whether paused or not; `resume()`
   continues from the current state; `reset()` rebuilds `createInitialState(options)` (same seed
   and capacity) and keeps the pause flag. The runner exposes no other way to change state.
-- Rendering may interpolate between the previous and current snapshot (Intended; not needed
-  until motion is fast enough to show judder).
+- `runner.alpha` is the fraction of a tick accumulated but not yet run, in [0, 1) (0 while
+  paused). Rendering may interpolate between the snapshot one tick before the current one and
+  the current one by `alpha` (implemented, opt-in: `startHostLoop({ interpolate })`, placeholder
+  fighter x only; the Simulation Lab can toggle it, the game does not enable it). The blend snaps
+  to the current snapshot unless the previous one is exactly one frame behind (reset, seek).
+  Interpolation is presentation only and never feeds back into the simulation.
 
 ### Determinism
 
@@ -257,18 +261,27 @@ type BoundaryContactEvent = {
   There is no global event bus and no subscription from inside the simulation.
 - Events are outputs only: they never feed back into gameplay.
 
-## Presentation — Implemented (minimal)
+## Presentation — Implemented (infrastructure)
 
-`@mortal-doctrine/renderer` creates a PixiJS application, appends its canvas to a host element,
-draws snapshots and exposes `onFrame`, `fps` and `frameCpuMs`. It holds Pixi objects privately and
-never mutates simulation state. It draws into a 960×540 logical viewport, CSS-scaled to the host
-width.
+`@mortal-doctrine/renderer` creates a PixiJS application, appends its canvas to a host element
+and never mutates simulation state. Other presentation packages extend it without editing it:
+
+- **Viewport:** a creation option (`width`, `height`, default 960×540), CSS-scaled to the host
+  width; canvas backing store at 1×.
+- **View:** a Pixi-free world→screen transform `{ scale, originX, originY }` from y-up sub-units
+  to y-down logical pixels. The default framing shows 960 world units across with the ground
+  line 80 units above the bottom edge; `setView` is the hook a camera (M1.11) drives.
+- **Layers:** ordered named containers (default `background`, `fighters`, `effects`, `overlay`,
+  bottom first). A renderable names its layer, is mounted into it via `register` (which returns
+  an unregister), receives `{ state, previous, alpha, events, view }` every drawn frame and has
+  a `destroy` hook. The placeholder floor and fighters are registered renderables.
+- **Textures:** `loadTextureManifest` validates a `schemaVersion: 1` manifest with Zod and loads
+  textures through Pixi `Assets` at a per-call resolution (default 2×), with a release function.
+- **Host loop:** `startHostLoop` owns renderer + runner + frame subscription for the game and
+  the Simulation Lab (the Replay, Command and Input Labs keep their own setup).
 
 The 960×540 viewport and the 2× texture resolution are **defaults, not architectural
-constraints**. Today the renderer hard-codes its own viewport constants and converts simulation
-sub-units to logical pixels by dividing by `SUBUNITS_PER_UNIT`. Making viewport size, resolution and the world→screen mapping configurable
-(with the camera owning framing) is rendering-infrastructure work (M1). No code may assume the
-logical viewport equals the arena width.
+constraints**. No code may assume the logical viewport equals the arena width.
 
 ## Animation — Intended
 
@@ -291,6 +304,6 @@ Each lab is a folder `apps/studio/src/labs/<id>/` with a `lab.ts` exporting a ty
 ## Deferred functionality (explicit non-goals of M0)
 
 Combat, hitboxes, collision, jumping, combos, special moves, skeletal animation, characters,
-arenas, effects, camera, audio, AI, menus, settings, persistence, networking, rollback,
-render interpolation. (The seeded RNG, simulation events, gamepad input and replays now exist;
-see above.)
+arenas, effects, camera, audio, AI, menus, settings, persistence, networking, rollback.
+(The seeded RNG, simulation events, gamepad input, replays and opt-in render interpolation now
+exist; see above.)

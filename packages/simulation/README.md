@@ -48,14 +48,16 @@ Adding a subsystem means adding one explicit call in `step` and one slice to the
 | `SimulationEvent`, `BoundaryContactEvent`                  | `CommandEvent` (`@mortal-doctrine/commands`) or `{ type: 'boundary-contact', frame, player: 0 \| 1, side: 'left' \| 'right' }` on the tick x reaches an edge it was not at. Events arrays are new and frozen                                                              |
 | `serializeState` / `deserializeState`, `SCHEMA_VERSION`    | JSON `{ schemaVersion: 1, state }`; deserialization throws naming the found/supported version or the failing path, never returning partial state                                                                                                                          |
 | `simulationStateSchema`, `SimulationState`, `FighterState` | Zod schema and types                                                                                                                                                                                                                                                      |
-| `createSimulationRunner(options?)`                         | Fixed-step driver: `advance(elapsedMs, provider) → { ticks, events }`, `stepOnce(provider) → events`, `pause`, `resume`, `reset`                                                                                                                                          |
+| `createSimulationRunner(options?)`                         | Fixed-step driver: `advance(elapsedMs, provider) → { ticks, events }`, `stepOnce(provider) → events`, `alpha`, `pause`, `resume`, `reset`                                                                                                                                 |
 | `InputProvider`, `AdvanceResult`, `SimulationRunner`       | `InputProvider` is `(frame) => FrameInputs`, called once per tick with the frame about to be processed                                                                                                                                                                    |
 | `DEFAULT_HISTORY_CAPACITY`, `MAX_HISTORY_CAPACITY`         | `60`, `600`                                                                                                                                                                                                                                                               |
 | `ARENA_WIDTH`, `FIGHTER_WIDTH`, `WALK_SPEED`               | `96000`, `6000` sub-units; `400` sub-units per frame                                                                                                                                                                                                                      |
 
 Runner: paused `advance` returns `{ ticks: 0, events: [] }` without calling the provider;
 catch-up is capped at 250 ms; `stepOnce` runs one tick regardless of pause; `reset()` rebuilds
-`createInitialState(options)` and keeps the pause flag.
+`createInitialState(options)` and keeps the pause flag. `alpha` is the fraction of a tick
+accumulated but not yet run, in [0, 1) (0 initially, while paused and after `reset`); renderers
+may use it to interpolate between snapshots. Reading it never affects state.
 
 `@mortal-doctrine/simulation/testing` exports fixtures for tests, benchmarks and labs: `held`
 (ORs `InputBit`s into a frame), `IDLE`, `P1_RIGHT`, `P1_LEFT`, `SEEDED_OPTIONS` (non-default
