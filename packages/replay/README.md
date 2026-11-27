@@ -63,9 +63,10 @@ Call protocol:
   Missing options are stored as explicit defaults.
 - The wrapped provider must be called once per tick, in order, with the frame the state is at
   (which is what the runner does). For frame `f` it throws "non-contiguous" unless
-  `f === recorder.length === getState().frame`; takes the checksum for `f` when `f > 0` and
-  `f % checksumInterval === 0`; then calls `inner(f)` once, validates the result, records it and
-  returns it unchanged.
+  `f === recorder.length === getState().frame`; calls `inner(f)` once and validates the result;
+  takes the checksum for `f` when `f > 0` and `f % checksumInterval === 0`; then records the
+  inputs and returns them unchanged. If `inner` throws or returns invalid inputs, nothing is
+  recorded for `f`, so the call can be retried or the recording finished.
 - Every tick of the session must go through the wrapped provider. `finish()` throws if the state
   frame differs from the recorded length (for example after a tick that bypassed the recorder,
   or after `step` threw), takes the final checksum and returns the replay. The recorder cannot be

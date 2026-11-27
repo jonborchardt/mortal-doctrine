@@ -122,7 +122,9 @@ export function createReplayPlayer(replay: Replay): ReplayPlayer {
         throw new RangeError(`Seek frame must be an integer in [0, ${length}], got ${frame}`);
       }
       // ponytail: a backward seek re-simulates from frame 0 (about 6,000 cheap ticks for a 99 s
-      // match). Keep periodic in-memory snapshots if step cost ever makes that noticeable.
+      // match). Measured in the Replay Lab (Chromium, dev build) on a 5,940-tick replay: a
+      // backward slider drag near the end costs 12 ms median, 23 ms worst per change; forward
+      // changes cost 3 ms. Keep periodic in-memory snapshots if step cost makes that noticeable.
       if (frame < state.frame) rewind();
       while (state.frame < frame && tick());
       if (desync) pause();

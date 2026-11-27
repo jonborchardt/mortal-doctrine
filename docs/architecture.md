@@ -26,14 +26,14 @@ future milestones, not yet built). Decision records live in [decisions/](decisio
 
 ## Layers — Implemented (enforced)
 
-| #   | Layer          | Contains                                                        | Today               |
-| --- | -------------- | --------------------------------------------------------------- | ------------------- |
-| 1   | `foundation`   | math primitives, narrowly scoped shared contracts               | `sim-core`, `math`  |
-| 2   | `simulation`   | headless gameplay: state, stepping, movement, collision, combat | `simulation`        |
-| 3   | `animation`    | presentation-independent skeleton and animation evaluation      | —                   |
-| 4   | `presentation` | rendering, effects, camera, audio, browser device adapters      | `renderer`, `input` |
-| 5   | `content`      | `characters/*`, `arenas/*`                                      | —                   |
-| 6   | `application`  | `apps/*` composition and tooling                                | `game`, `studio`    |
+| #   | Layer          | Contains                                                        | Today                  |
+| --- | -------------- | --------------------------------------------------------------- | ---------------------- |
+| 1   | `foundation`   | math primitives, narrowly scoped shared contracts               | `sim-core`, `math`     |
+| 2   | `simulation`   | headless gameplay: state, stepping, movement, collision, combat | `simulation`, `replay` |
+| 3   | `animation`    | presentation-independent skeleton and animation evaluation      | —                      |
+| 4   | `presentation` | rendering, effects, camera, audio, browser device adapters      | `renderer`, `input`    |
+| 5   | `content`      | `characters/*`, `arenas/*`                                      | —                      |
+| 6   | `application`  | `apps/*` composition and tooling                                | `game`, `studio`       |
 
 A package declares its layer in `package.json`:
 

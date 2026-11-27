@@ -52,12 +52,13 @@ export function createReplayRecorder(config: ReplayRecorderConfig): ReplayRecord
   let digest = EMPTY_INPUTS_DIGEST;
   let finished = false;
 
-  const checksum = (state: SimulationState) =>
+  const takeChecksum = (state: SimulationState) => {
     checksums.push({
       frame: state.frame,
       stateHash: hashState(state),
       inputsHash: formatHash(digest),
     });
+  };
 
   return {
     get length() {
@@ -72,8 +73,10 @@ export function createReplayRecorder(config: ReplayRecorderConfig): ReplayRecord
             `${inputs.length} ticks recorded and the state at frame ${state.frame}`,
         );
       }
-      if (frame > 0 && frame % checksumInterval === 0) checksum(state);
+      // Validated before anything is saved: a throwing or invalid inner provider leaves no
+      // checksum behind for a later retry or `finish()` to duplicate.
       const frameInputs = parseFrameInputs(inner(frame));
+      if (frame > 0 && frame % checksumInterval === 0) takeChecksum(state);
       inputs.push(frameInputs);
       digest = digestInputs(digest, frameInputs);
       return frameInputs;
@@ -88,7 +91,7 @@ export function createReplayRecorder(config: ReplayRecorderConfig): ReplayRecord
         );
       }
       finished = true;
-      checksum(state);
+      takeChecksum(state);
       return { replayVersion: REPLAY_VERSION, options, checksumInterval, inputs, checksums };
     },
   };

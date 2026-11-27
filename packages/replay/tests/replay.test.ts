@@ -8,7 +8,7 @@ import {
   type InputProvider,
 } from '@mortal-doctrine/simulation';
 import { runFrames, SEEDED_OPTIONS, walkCycleScript } from '@mortal-doctrine/simulation/testing';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import {
   createReplayPlayer,
   createReplayRecorder,
@@ -17,6 +17,7 @@ import {
   replaySchema,
   serializeReplay,
   type Replay,
+  type ReplayPlayer,
 } from '../src/index';
 
 const MATCH_TICKS = 99 * 60;
@@ -67,7 +68,11 @@ function asJson(replay: Replay) {
 }
 
 describe('record and play back', () => {
-  const { replay, live } = record(MATCH_TICKS);
+  let replay: Replay;
+  let live: string[];
+  beforeAll(() => {
+    ({ replay, live } = record(MATCH_TICKS));
+  });
 
   it('reproduces a 99 second session byte for byte at every checksum frame', () => {
     expect(replay.inputs).toHaveLength(MATCH_TICKS);
@@ -249,6 +254,38 @@ describe('recorder', () => {
     expect(() => strict.finish()).toThrow(/finished/);
   });
 
+  it('leaves no checksum behind when the inner provider fails on a checksum frame', () => {
+    const runner = createSimulationRunner(SEEDED_OPTIONS);
+    const recorder = createReplayRecorder({
+      options: SEEDED_OPTIONS,
+      checksumInterval: 3,
+      getState: () => runner.state,
+    });
+    let failure: 'throw' | 'invalid' | null = null;
+    const provider = recorder.provider((frame) => {
+      if (failure === 'throw') throw new Error('device lost');
+      return failure === 'invalid' ? [0, 1 << 10] : walkCycleScript(frame);
+    });
+    for (let i = 0; i < 3; i++) runner.stepOnce(provider);
+    // Frame 3 is a checksum frame; both failures leave the session and the recording at it.
+    failure = 'throw';
+    expect(() => runner.stepOnce(provider)).toThrow('device lost');
+    failure = 'invalid';
+    expect(() => runner.stepOnce(provider)).toThrow(/Invalid FrameInputs/);
+    expect(recorder.length).toBe(3);
+    // A retry records the tick with one checksum for frame 3.
+    failure = null;
+    runner.stepOnce(provider);
+    failure = 'throw';
+    for (let i = 0; i < 2; i++) runner.stepOnce(recorder.provider(walkCycleScript));
+    // Finishing straight after a failure on checksum frame 6 takes that checksum once.
+    expect(() => runner.stepOnce(provider)).toThrow('device lost');
+    const replay = recorder.finish();
+    expect(replay.checksums.map((checksum) => checksum.frame)).toEqual([3, 6]);
+    expect(replaySchema.parse(replay)).toEqual(replay);
+    expect(replay).toEqual(record(6, walkCycleScript, 3).replay);
+  });
+
   it('never mutates the states it reads', () => {
     let state = deepFreeze(createInitialState(SEEDED_OPTIONS));
     const recorder = createReplayRecorder({
@@ -265,7 +302,11 @@ describe('recorder', () => {
 });
 
 describe('tamper detection', () => {
-  const { replay, live } = record(300);
+  let replay: Replay;
+  let live: string[];
+  beforeAll(() => {
+    ({ replay, live } = record(300));
+  });
   const { A2, RIGHT } = InputBit;
 
   it.each([
@@ -281,9 +322,11 @@ describe('tamper detection', () => {
     for (let i = 0; i < 100; i++) player.advance(TICK_MS * 10);
     expect(player.desync?.frame).toBe(frame);
     expect(player.desync?.actual.stateHash).not.toBe(player.desync?.expected.stateHash);
+    const recorded = replay.checksums.find((checksum) => checksum.frame === frame);
+    expect(recorded).toBeDefined();
     expect(player.desync?.expected).toEqual({
-      stateHash: replay.checksums.find((checksum) => checksum.frame === frame)?.stateHash,
-      inputsHash: replay.checksums.find((checksum) => checksum.frame === frame)?.inputsHash,
+      stateHash: recorded?.stateHash,
+      inputsHash: recorded?.inputsHash,
     });
     expect(player.frame).toBe(frame);
     expect(player.paused).toBe(true);
@@ -309,8 +352,8 @@ describe('tamper detection', () => {
     // SEEDED_OPTIONS keeps 8 history frames, so tick 100 has left the state by frame 120.
     const tampered = tamper(replay, 100, ([p1, p2]) => [p1 ^ A2, p2]);
     for (const reach of [
-      (player: ReturnType<typeof createReplayPlayer>) => player.seek(300),
-      (player: ReturnType<typeof createReplayPlayer>) => {
+      (player: ReplayPlayer) => player.seek(300),
+      (player: ReplayPlayer) => {
         while (player.stepOnce());
       },
     ]) {
@@ -326,10 +369,15 @@ describe('tamper detection', () => {
 });
 
 describe('deserializeReplay', () => {
-  const { replay } = record(130);
-  const reject = (change: (json: ReturnType<typeof asJson>) => unknown) => {
+  let replay: Replay;
+  beforeAll(() => {
+    ({ replay } = record(130));
+  });
+  /** Expectation on importing the fixture replay after `mutate` changed its JSON value. */
+  const reject = (mutate: (json: ReturnType<typeof asJson>) => void) => {
     const json = asJson(replay);
-    return expect(() => deserializeReplay(JSON.stringify(change(json) ?? json)));
+    mutate(json);
+    return expect(() => deserializeReplay(JSON.stringify(json)));
   };
 
   it('rejects text that is not JSON', () => {
@@ -338,59 +386,87 @@ describe('deserializeReplay', () => {
   });
 
   it('rejects missing and unknown versions, naming found and supported', () => {
-    reject((json) => void (json.replayVersion = 2)).toThrow(
-      'Unsupported replayVersion 2; supported: 1',
-    );
-    reject((json) => void (json.replayVersion = '1')).toThrow(
-      'Unsupported replayVersion "1"; supported: 1',
-    );
-    reject((json) => void delete json.replayVersion).toThrow(
+    reject((json) => {
+      json.replayVersion = 2;
+    }).toThrow('Unsupported replayVersion 2; supported: 1');
+    reject((json) => {
+      json.replayVersion = '1';
+    }).toThrow('Unsupported replayVersion "1"; supported: 1');
+    reject((json) => {
+      delete json.replayVersion;
+    }).toThrow('Unsupported replayVersion undefined; supported: 1');
+    expect(() => deserializeReplay('[1,2]')).toThrow(
       'Unsupported replayVersion undefined; supported: 1',
     );
-    reject(() => [1, 2]).toThrow('Unsupported replayVersion undefined; supported: 1');
-    reject(() => 'replay').toThrow('Unsupported replayVersion undefined; supported: 1');
+    expect(() => deserializeReplay('"replay"')).toThrow(
+      'Unsupported replayVersion undefined; supported: 1',
+    );
   });
 
   it('rejects schema failures, naming the failing path', () => {
-    reject((json) => void (json.inputs[7] = [0, 1024])).toThrow(
-      /Invalid replay: replay\.inputs\.7\.1: /,
-    );
-    reject((json) => void (json.inputs[3] = [0])).toThrow(/replay\.inputs\.3: /);
-    reject((json) => void (json.inputs[3] = [0, 1.5])).toThrow(/replay\.inputs\.3\.1: /);
-    reject((json) => void delete json.checksumInterval).toThrow(/replay\.checksumInterval: /);
-    reject((json) => void (json.checksumInterval = 0)).toThrow(/replay\.checksumInterval: /);
-    reject((json) => void delete (json as Partial<typeof json>).inputs).toThrow(/replay\.inputs: /);
-    reject((json) => void (json.options.seed = -1)).toThrow(/replay\.options\.seed: /);
-    reject((json) => void (json.options.seed = 2 ** 32)).toThrow(/replay\.options\.seed: /);
-    reject((json) => void delete json.options.seed).toThrow(/replay\.options\.seed: /);
-    reject((json) => void (json.options.historyCapacity = 0)).toThrow(
-      /replay\.options\.historyCapacity: /,
-    );
-    reject((json) => void (json.options.historyCapacity = 601)).toThrow(
-      /replay\.options\.historyCapacity: /,
-    );
-    reject((json) => void (json.checksums[0]!.stateHash = 'XYZ')).toThrow(
-      /replay\.checksums\.0\.stateHash: expected 8 lowercase hex digits/,
-    );
+    reject((json) => {
+      json.inputs[7] = [0, 1024];
+    }).toThrow(/Invalid replay: replay\.inputs\.7\.1: /);
+    reject((json) => {
+      json.inputs[3] = [0];
+    }).toThrow(/replay\.inputs\.3: /);
+    reject((json) => {
+      json.inputs[3] = [0, 1.5];
+    }).toThrow(/replay\.inputs\.3\.1: /);
+    reject((json) => {
+      delete json.checksumInterval;
+    }).toThrow(/replay\.checksumInterval: /);
+    reject((json) => {
+      json.checksumInterval = 0;
+    }).toThrow(/replay\.checksumInterval: /);
+    reject((json) => {
+      delete (json as Partial<typeof json>).inputs;
+    }).toThrow(/replay\.inputs: /);
+    reject((json) => {
+      json.options.seed = -1;
+    }).toThrow(/replay\.options\.seed: /);
+    reject((json) => {
+      json.options.seed = 2 ** 32;
+    }).toThrow(/replay\.options\.seed: /);
+    reject((json) => {
+      delete json.options.seed;
+    }).toThrow(/replay\.options\.seed: /);
+    reject((json) => {
+      json.options.historyCapacity = 0;
+    }).toThrow(/replay\.options\.historyCapacity: /);
+    reject((json) => {
+      json.options.historyCapacity = 601;
+    }).toThrow(/replay\.options\.historyCapacity: /);
+    reject((json) => {
+      json.checksums[0]!.stateHash = 'XYZ';
+    }).toThrow(/replay\.checksums\.0\.stateHash: expected 8 lowercase hex digits/);
   });
 
   it('rejects checksum frames that are empty, unordered, out of range or not final', () => {
     // The fixture has checksums at frames 60, 120 and 130.
-    reject((json) => void (json.checksums = [])).toThrow(
-      /replay\.checksums: needs at least one checksum/,
-    );
-    reject((json) => void (json.checksums[1]!.frame = 60)).toThrow(
-      /replay\.checksums\.1\.frame: frame 60 does not ascend from 60/,
-    );
-    reject((json) => void json.checksums.reverse()).toThrow(/does not ascend from/);
-    reject((json) => void (json.checksums[2]!.frame = 131)).toThrow(
-      /replay\.checksums\.2\.frame: frame 131 is outside 0\.\.130/,
-    );
-    reject((json) => void (json.checksums[0]!.frame = -1)).toThrow(/replay\.checksums\.0\.frame: /);
-    reject((json) => void json.checksums.pop()).toThrow(
+    reject((json) => {
+      json.checksums = [];
+    }).toThrow(/replay\.checksums: needs at least one checksum/);
+    reject((json) => {
+      json.checksums[1]!.frame = 60;
+    }).toThrow(/replay\.checksums\.1\.frame: frame 60 does not ascend from 60/);
+    reject((json) => {
+      json.checksums.reverse();
+    }).toThrow(/does not ascend from/);
+    reject((json) => {
+      json.checksums[2]!.frame = 131;
+    }).toThrow(/replay\.checksums\.2\.frame: frame 131 is outside 0\.\.130/);
+    reject((json) => {
+      json.checksums[0]!.frame = -1;
+    }).toThrow(/replay\.checksums\.0\.frame: /);
+    reject((json) => {
+      json.checksums.pop();
+    }).toThrow(
       /replay\.checksums\.1\.frame: last checksum frame 120 must equal the input count 130/,
     );
-    reject((json) => void json.inputs.push([0, 0])).toThrow(/must equal the input count 131/);
+    reject((json) => {
+      json.inputs.push([0, 0]);
+    }).toThrow(/must equal the input count 131/);
   });
 });
 

@@ -15,10 +15,13 @@ async function recordWalk(page: Page) {
   await page.keyboard.down('KeyD');
   await button(page, 'Record').click();
   await expect(mode).toHaveText('recording');
+  // Reset would discard the live recording, so it waits for Stop.
+  await expect(button(page, 'Reset')).toBeDisabled();
   await expect.poll(async () => Number(await frame.textContent())).toBeGreaterThan(120);
   await page.keyboard.up('KeyD');
   await button(page, 'Stop').click();
   await expect(mode).toHaveText('paused');
+  await expect(button(page, 'Reset')).toBeEnabled();
 
   // Stop shows the last recorded frame.
   const length = (await page.getByTestId('replay-length').textContent()) ?? '';
@@ -55,6 +58,9 @@ test('replay lab is linked from the navigation and loads with exactly one canvas
   await expect(page.getByTestId('arena').locator('canvas')).toHaveCount(1);
   await expect(page.getByTestId('replay-frame')).toHaveText('0');
   await expect(page.getByTestId('replay-p1-x')).toHaveText(INITIAL_X);
+  // No replay is loaded, which is not the same as a clean playback ("none").
+  await expect(page.getByTestId('replay-desync')).toHaveText('—');
+  await expect(button(page, 'Reset')).toBeEnabled();
 });
 
 test('a recording of live input replays to the recorded final frame and position', async ({
@@ -86,6 +92,7 @@ test('steps, seeks, exports and imports a replay; a malformed import is rejected
 
   await button(page, 'Export').click();
   await expect(json).toHaveValue(/^\{"replayVersion":1,/);
+  await expect(json).toBeFocused();
   const exported = await json.inputValue();
 
   // A malformed import reports the problem and keeps the loaded replay where it was.
@@ -99,8 +106,16 @@ test('steps, seeks, exports and imports a replay; a malformed import is rejected
   await expect(page.getByRole('alert')).toContainText('Replay is not valid JSON');
   await expect(frame).toHaveText('31');
   await expect(page.getByTestId('replay-length')).toHaveText(recorded.length);
+  // The failure message does not outlive the next action.
+  await button(page, 'Pause').click();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(frame).toHaveText('31');
 
-  // Importing the exported text into a reset lab reproduces the recording.
+  // Reset clears a failure message too; importing the exported text into the reset lab then
+  // reproduces the recording.
+  await json.fill('not a replay');
+  await button(page, 'Import').click();
+  await expect(page.getByRole('alert')).toContainText('Replay is not valid JSON');
   await button(page, 'Reset').click();
   await expect(page.getByTestId('replay-mode')).toHaveText('idle');
   await expect(page.getByRole('alert')).toHaveCount(0);
@@ -125,5 +140,6 @@ test('an imported replay with a changed input frame stops at the next checksum',
   await button(page, 'Play').click();
   await expect(page.getByTestId('replay-desync')).toContainText('frame 60: state ');
   await expect(page.getByTestId('replay-frame')).toHaveText('60');
-  await expect(page.getByTestId('replay-mode')).toHaveText('paused');
+  // A desync stop is named; it does not read as a user pause.
+  await expect(page.getByTestId('replay-mode')).toHaveText('desync');
 });

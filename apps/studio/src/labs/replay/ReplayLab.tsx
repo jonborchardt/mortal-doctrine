@@ -43,6 +43,8 @@ interface Actions {
   /** Throws, leaving the current replay in place, when the text is not a valid replay. */
   importJson(): View;
   reset(): View;
+  /** The view as it is now, for after an action that threw. */
+  view(): View;
 }
 
 export function ReplayLab() {
@@ -53,7 +55,7 @@ export function ReplayLab() {
   const actionsRef = useRef<Actions | null>(null);
   const [ready, setReady] = useState(false);
   const [view, setView] = useState<View>(IDLE);
-  const [importError, setImportError] = useState<string | null>(null);
+  const [alert, setAlert] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -112,7 +114,11 @@ export function ReplayLab() {
           stop() {
             // Show the recorded final frame; Play starts over from frame 0.
             if (recording) {
-              const recorded = load(recording.recorder.finish());
+              // A recording that cannot be finished cannot be continued either: it is dropped
+              // before `finish` can throw, and the failure is shown as an alert.
+              const { recorder } = recording;
+              recording = null;
+              const recorded = load(recorder.finish());
               recorded.seek(recorded.length);
             }
             return current();
@@ -136,7 +142,12 @@ export function ReplayLab() {
             return current();
           },
           exportJson() {
-            if (replay) json.value = serializeReplay(replay);
+            if (replay) {
+              json.value = serializeReplay(replay);
+              // Moves focus to the result, selected for copying, so the export is perceivable.
+              json.focus();
+              json.select();
+            }
             return current();
           },
           importJson() {
@@ -149,6 +160,7 @@ export function ReplayLab() {
             player = null;
             return current();
           },
+          view: current,
         };
 
         const readouts = new Map(
@@ -170,20 +182,21 @@ export function ReplayLab() {
           renderer.render(state);
 
           const frame = String(state.frame);
-          write(
-            'mode',
-            recording ? 'recording' : player ? (player.paused ? 'paused' : 'playing') : 'idle',
-          );
+          const desync = player?.desync;
+          // A desync stop is named, so it cannot be mistaken for a user pause.
+          const playback = desync ? 'desync' : player?.paused ? 'paused' : 'playing';
+          write('mode', recording ? 'recording' : player ? playback : 'idle');
           write('frame', frame);
           write('length', String(recording?.recorder.length ?? player?.length ?? 0));
           write('x', String(state.fighters[0].x));
-          const desync = player?.desync;
           write(
             'desync',
             desync
               ? `frame ${desync.frame}: state ${desync.actual.stateHash} (recorded ${desync.expected.stateHash}), ` +
                   `inputs ${desync.actual.inputsHash} (recorded ${desync.expected.inputsHash})`
-              : 'none',
+              : player
+                ? 'none'
+                : '—',
           );
           if (seekInput.value !== frame) seekInput.value = frame;
         });
@@ -208,29 +221,30 @@ export function ReplayLab() {
   }, []);
 
   // Event handlers only: refs must not be read during render.
-  const run = (action: (actions: Actions) => View) => () => {
+  // Every control clears the alert, so a failure message never outlives the next action.
+  const run = (name: string, action: (actions: Actions) => View) => () => {
     const actions = actionsRef.current;
-    if (actions) setView(action(actions));
-  };
-  const importReplay = () => {
+    if (!actions) return;
+    setAlert(null);
     try {
-      run((actions) => actions.importJson())();
-      setImportError(null);
+      setView(action(actions));
     } catch (cause) {
-      setImportError(cause instanceof Error ? cause.message : String(cause));
+      setAlert(`${name} failed: ${cause instanceof Error ? cause.message : String(cause)}`);
+      setView(actions.view());
     }
-  };
-  const reset = () => {
-    run((actions) => actions.reset())();
-    setImportError(null);
   };
 
   const { mode } = view;
   const playback = mode === 'playback';
   const buttonClass =
     'rounded bg-neutral-800 px-3 py-1 text-sm hover:bg-neutral-700 disabled:opacity-40';
-  const button = (name: string, enabled: boolean, onClick: () => void) => (
-    <button type="button" className={buttonClass} disabled={!ready || !enabled} onClick={onClick}>
+  const button = (name: string, enabled: boolean, action: (actions: Actions) => View) => (
+    <button
+      type="button"
+      className={buttonClass}
+      disabled={!ready || !enabled}
+      onClick={run(name, action)}
+    >
       {name}
     </button>
   );
@@ -245,32 +259,13 @@ export function ReplayLab() {
         </span>
       </header>
       <div className="flex flex-wrap items-center gap-2">
-        {button(
-          'Record',
-          mode !== 'recording',
-          run((actions) => actions.record()),
-        )}
-        {button(
-          'Stop',
-          mode === 'recording',
-          run((actions) => actions.stop()),
-        )}
-        {button(
-          'Play',
-          playback,
-          run((actions) => actions.play()),
-        )}
-        {button(
-          'Pause',
-          playback,
-          run((actions) => actions.pause()),
-        )}
-        {button(
-          'Step',
-          playback,
-          run((actions) => actions.step()),
-        )}
-        {button('Reset', true, reset)}
+        {button('Record', mode !== 'recording', (actions) => actions.record())}
+        {button('Stop', mode === 'recording', (actions) => actions.stop())}
+        {button('Play', playback, (actions) => actions.play())}
+        {button('Pause', playback, (actions) => actions.pause())}
+        {button('Step', playback, (actions) => actions.step())}
+        {/* Disabled while recording: Reset would discard the live recording; Stop keeps it. */}
+        {button('Reset', mode !== 'recording', (actions) => actions.reset())}
         <label className="flex items-center gap-2 text-sm text-neutral-400">
           Seek
           <input
@@ -281,7 +276,9 @@ export function ReplayLab() {
             step={1}
             defaultValue={0}
             disabled={!playback}
-            onChange={(event) => run((actions) => actions.seek(event.target.valueAsNumber))()}
+            onChange={(event) =>
+              run('Seek', (actions) => actions.seek(event.target.valueAsNumber))()
+            }
             className="w-64"
           />
         </label>
@@ -298,7 +295,7 @@ export function ReplayLab() {
         <dt>P1 x (sub-units)</dt>
         <dd data-testid="replay-p1-x" data-readout="x" />
         <dt>Desync</dt>
-        <dd data-testid="replay-desync" data-readout="desync" />
+        <dd data-testid="replay-desync" data-readout="desync" aria-live="polite" />
       </dl>
       <div ref={hostRef} data-testid="arena" className="w-full max-w-[960px]" />
       <div className="space-y-2">
@@ -313,23 +310,21 @@ export function ReplayLab() {
           className="block w-full max-w-[960px] rounded bg-neutral-900 p-2 font-mono text-xs"
         />
         <div className="flex gap-2">
-          {button(
-            'Export',
-            playback,
-            run((actions) => actions.exportJson()),
-          )}
-          {button('Import', mode !== 'recording', importReplay)}
+          {button('Export', playback, (actions) => actions.exportJson())}
+          {button('Import', mode !== 'recording', (actions) => actions.importJson())}
         </div>
-        {importError && (
+        {alert && (
           <p role="alert" className="text-sm text-red-400">
-            Import failed: {importError}
+            {alert}
           </p>
         )}
       </div>
       <p className="text-sm text-neutral-400">
-        Record restarts from the fixture and records live input (Player 1: ← → or A / D; Player 2:
-        numpad 4 / 6 or the first gamepad). Stop shows the last recorded frame; Play re-simulates
-        the replay from its inputs and stops at a checksum that does not match.
+        Record restarts from the fixture, replaces the loaded replay and records live input (Player
+        1: ← → or A / D; Player 2: numpad 4 / 6 or the first gamepad). Stop keeps the recording and
+        shows its last frame; Reset is available once recording has stopped. Play re-simulates the
+        replay from its inputs. At a checksum that does not match, the mode becomes desync and
+        playback cannot pass that frame: Seek back, or Import or Record another replay.
       </p>
       {error && <p className="text-red-400">Renderer failed: {error}</p>}
     </section>
