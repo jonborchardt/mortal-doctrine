@@ -268,7 +268,12 @@ export function createAudioPlayer(options: AudioPlayerOptions): AudioPlayer {
       if (state !== 'unlocked') return;
       const occurrences = new Map<string, number>();
       for (const event of events) {
-        const base = JSON.stringify(event, Object.keys(event).sort());
+        const fields = event as unknown as Readonly<Record<string, unknown>>;
+        const base = JSON.stringify(
+          Object.keys(fields)
+            .sort()
+            .map((field) => [field, fields[field]]),
+        );
         const occurrence = occurrences.get(base) ?? 0;
         occurrences.set(base, occurrence + 1);
         const key = `${base}#${occurrence}`;

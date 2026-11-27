@@ -4,9 +4,9 @@ const AUDIO_LAB = '/labs/audio';
 
 // Variations are a pure function of event identity, so this list is fixed.
 const FIXTURE_LOG = [
-  'frame 4 · command → command (command-mid)',
-  'frame 4 · command → command (command-mid)',
-  'frame 12 · command → command (command-low)',
+  'frame 4 · command → command (command-low)',
+  'frame 4 · command → command (command-low)',
+  'frame 12 · command → command (command-high)',
   'frame 20 · jump → jump (jump-voice)',
   'frame 52 · land → land (land-thud)',
   'frame 70 · wall-contact → wall (wall-sting)',
@@ -38,6 +38,11 @@ test('unlock, fire, re-simulate, bus controls and reset', async ({ page }, testI
 
   await page.getByRole('button', { name: 'Unlock' }).click();
   await expect(state).toHaveText('unlocked');
+  // Events fired while locked were dropped, so Re-simulate has nothing to re-send.
+  await page.getByRole('button', { name: 'Re-simulate' }).click();
+  // Firing one event then shows only that event: the locked-period events were not replayed.
+  await page.getByRole('region', { name: 'Fixture events' }).getByRole('button').first().click();
+  await expect(log).toHaveText(FIXTURE_LOG.slice(0, 1));
   await fireAll(page);
   await expect(log).toHaveText(FIXTURE_LOG);
 
@@ -48,7 +53,7 @@ test('unlock, fire, re-simulate, bus controls and reset', async ({ page }, testI
   await page.getByRole('slider', { name: 'sfx volume' }).fill('0.5');
   await expect(page.getByTestId('audio-bus-sfx')).toHaveText('50%');
   await page.getByRole('checkbox', { name: 'Mute music' }).check();
-  await expect(page.getByTestId('audio-bus-music')).toHaveText('muted');
+  await expect(page.getByTestId('audio-bus-music')).toHaveText('muted · 100%');
   await expect(page.getByTestId('audio-bus-voice')).toHaveText('100%');
   // Review evidence: the triggered-cue list and bus controls.
   await page.screenshot({ path: testInfo.outputPath('audio-lab-fixture.png'), fullPage: true });

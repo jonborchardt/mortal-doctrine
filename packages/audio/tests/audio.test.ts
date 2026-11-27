@@ -67,6 +67,15 @@ describe('dedupe', () => {
     expect(context.sources).toHaveLength(3);
   });
 
+  it('tells events apart by nested fields', () => {
+    const { context, player, unlock } = setup();
+    unlock();
+    const nested = (x: number) => ({ type: 'land', frame: 5, at: { x } });
+    player.play([nested(1)]);
+    player.play([nested(2)]);
+    expect(context.sources).toHaveLength(2);
+  });
+
   it('starts nothing for unconfigured event types', () => {
     const { context, player, unlock } = setup();
     unlock();
@@ -180,16 +189,18 @@ describe('dispose', () => {
     unlock();
     player.play(FIXTURE_EVENTS);
     const lockedTarget = new FakeGestureTarget();
+    const lockedContext = createFakeAudioContext();
     const lockedPlayer = createAudioPlayer({
-      context: createFakeAudioContext(),
+      context: lockedContext,
       cues: FIXTURE_CUES,
-      buffers: createToneBuffers(context),
+      buffers: createToneBuffers(lockedContext),
       gestureTarget: lockedTarget,
     });
 
     player.dispose();
     lockedPlayer.dispose();
     expect(context.closeCalls).toBe(1);
+    expect(lockedContext.closeCalls).toBe(1);
     expect(lockedTarget.listenerCount).toBe(0);
     expect(gestureTarget.listenerCount).toBe(0);
     expect(context.sources.every((source) => source.stopped === 1)).toBe(true);

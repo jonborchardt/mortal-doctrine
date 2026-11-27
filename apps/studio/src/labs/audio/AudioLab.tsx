@@ -104,6 +104,8 @@ export function AudioLab() {
   const fire = (event: Fixture) => {
     const session = sessionRef.current;
     if (!session) return;
+    // Locked players drop events without remembering them, so only played events are recorded.
+    if (session.player.state !== 'unlocked') return;
     if (!session.fired.includes(event)) session.fired.push(event);
     session.player.play([event]);
   };
@@ -113,10 +115,17 @@ export function AudioLab() {
   };
   const reset = () => {
     const unlockButton = unlockRef.current;
-    if (!unlockButton || !sessionRef.current) return;
-    sessionRef.current.player.dispose();
-    sessionRef.current = createSession(unlockButton);
+    if (!unlockButton) return;
+    sessionRef.current?.player.dispose();
+    sessionRef.current = null;
     setBuses(DEFAULT_BUSES);
+    try {
+      sessionRef.current = createSession(unlockButton);
+      setError(null);
+    } catch (cause) {
+      console.error(cause);
+      setError(String(cause));
+    }
   };
   const updateBus = (bus: AudioBus, change: Partial<BusState>) => {
     const player = sessionRef.current?.player;
@@ -133,7 +142,7 @@ export function AudioLab() {
       <header className="flex items-baseline gap-4">
         <h1 className="text-xl font-semibold">Audio Lab</h1>
         <span className="font-mono text-sm text-neutral-400">
-          Playback <span data-testid="audio-state" data-readout="state" />
+          Playback <span data-testid="audio-state" data-readout="state" aria-live="polite" />
         </span>
       </header>
       {error && (
@@ -172,6 +181,7 @@ export function AudioLab() {
           <div key={bus} className="contents">
             <span>{bus}</span>
             <input
+              id={`audio-volume-${bus}`}
               type="range"
               min={0}
               max={1}
@@ -188,8 +198,12 @@ export function AudioLab() {
               />
               Mute {bus}
             </label>
-            <output data-testid={`audio-bus-${bus}`} className="font-mono text-xs text-neutral-400">
-              {buses[bus].muted ? 'muted' : `${Math.round(buses[bus].volume * 100)}%`}
+            <output
+              htmlFor={`audio-volume-${bus}`}
+              data-testid={`audio-bus-${bus}`}
+              className="font-mono text-xs text-neutral-400"
+            >
+              {`${buses[bus].muted ? 'muted · ' : ''}${Math.round(buses[bus].volume * 100)}%`}
             </output>
           </div>
         ))}
