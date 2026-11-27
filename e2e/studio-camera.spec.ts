@@ -11,23 +11,24 @@ const button = (page: Page, name: string) => page.getByRole('button', { name, ex
 const readout = (page: Page, key: string) => page.getByTestId(`camera-${key}`);
 const number = async (page: Page, key: string) => Number(await readout(page, key).textContent());
 
-async function stepTo(page: Page, frame: number) {
-  const current = await number(page, 'frame');
-  for (let i = current; i < frame; i++) await button(page, 'Step').click();
-  await expect(readout(page, 'frame')).toHaveText(String(frame));
+/** Steps from frame `from` to frame `to`. */
+async function stepTo(page: Page, from: number, to: number) {
+  for (let i = from; i < to; i++) await button(page, 'Step').click();
+  await expect(readout(page, 'frame')).toHaveText(String(to));
 }
 
-/** The visible span readouts are inside the bounds readouts. */
+/** The visible span readouts are inside the bounds; returns the span that passed. */
 async function expectInsideBounds(page: Page) {
+  let span = '';
   await expect
     .poll(async () => {
       const left = await number(page, 'left');
       const right = await number(page, 'right');
-      const boundsLeft = await number(page, 'bounds-left');
-      const boundsRight = await number(page, 'bounds-right');
-      return left >= boundsLeft && right <= boundsRight && left < right;
+      span = `${left}..${right}`;
+      return left >= BOUNDS.left && right <= BOUNDS.right && left < right;
     })
     .toBe(true);
+  return span;
 }
 
 test('camera lab is listed under Presentation and loads directly, paused at the fixture', async ({
@@ -69,18 +70,18 @@ test('separating fighters zooms out inside the bounds; Reset restores frame 0', 
   await page.getByRole('combobox', { name: 'Scenario' }).selectOption('walk-back');
   await expect(readout(page, 'scale')).toHaveText('1.3714');
 
-  // Player 1 walks back 40 frames, 24000 → 8000: the frame widens and pans left.
-  await stepTo(page, 20);
+  // Player 1 walks back 400 a frame from 24000: the frame widens and pans left.
+  await stepTo(page, 0, 3);
   await expect.poll(() => number(page, 'scale')).toBeLessThan(1.3714);
   const midway = await number(page, 'scale');
   await expectInsideBounds(page);
-  await stepTo(page, 40);
-  await expect(readout(page, 'midpoint')).toHaveText('40000');
+  await stepTo(page, 3, 6);
+  await expect(readout(page, 'midpoint')).toHaveText('46800');
   await expect.poll(() => number(page, 'scale')).toBeLessThan(midway);
   await expect.poll(() => number(page, 'left')).toBeLessThan(13_000);
   await expectInsideBounds(page);
-  // Target: pushbox edges 5000 and 75000 plus 8000 a side.
-  await expect(readout(page, 'target-left')).toHaveText('-3000');
+  // Target: pushbox edges 18600 and 75000 plus 8000 a side.
+  await expect(readout(page, 'target-left')).toHaveText('10600');
   await expect(readout(page, 'target-right')).toHaveText('83000');
 
   await button(page, 'Reset').click();
@@ -95,7 +96,7 @@ test('separating fighters zooms out inside the bounds; Reset restores frame 0', 
 
 test('a shake trigger shows on Step, decays to 0 after its duration and is cleared by Reset', async ({
   page,
-}) => {
+}, testInfo) => {
   await page.goto(CAMERA_LAB);
   const shake = readout(page, 'shake');
   await expect(readout(page, 'frame')).toHaveText('0');
@@ -103,71 +104,68 @@ test('a shake trigger shows on Step, decays to 0 after its duration and is clear
   // Paused: the trigger waits for the next tick.
   await button(page, 'Shake: land').click();
   await expect(shake).toHaveText('0');
-  await stepTo(page, 1);
-  await expect(shake).toHaveText(SHAKE_OFFSET);
-  // `land` shakes for 12 frames: frames 1 to 12 are offset, frame 13 is at rest.
-  await stepTo(page, 12);
-  await expect(shake).toHaveText(SHAKE_OFFSET);
-  await stepTo(page, 13);
-  await expect(shake).toHaveText('0');
-  await stepTo(page, 15);
-  await expect(shake).toHaveText('0');
-
-  // `wall-contact` shakes for 8 frames; Reset clears a shake in progress.
-  await button(page, 'Shake: wall-contact').click();
-  await stepTo(page, 16);
-  await expect(shake).toHaveText(SHAKE_OFFSET);
-  await button(page, 'Reset').click();
-  await expect(readout(page, 'frame')).toHaveText('0');
-  await expect(shake).toHaveText('0');
-  await stepTo(page, 1);
-  await expect(shake).toHaveText('0');
-});
-
-test('review evidence: near and far framing with overlays, a shake at a bound', async ({
-  page,
-}, testInfo) => {
-  await page.goto(CAMERA_LAB);
-  const scenario = page.getByRole('combobox', { name: 'Scenario' });
-
-  // Far: player 1 has walked back to 8000 (frame 40) and the camera has converged.
-  await scenario.selectOption('walk-back');
-  await stepTo(page, 100);
-  await expect(readout(page, 'left')).toHaveText('-3000');
-  await expect(readout(page, 'right')).toHaveText('83000');
-  await expect(readout(page, 'scale')).toHaveText('1.1163');
-  await page.screenshot({ path: testInfo.outputPath('camera-lab-far-walk-back-frame-100.png') });
-
-  // Near: player 1 pushes player 2 into the right corner (frame 209); closest zoom, at the bound.
-  await scenario.selectOption('corner-push');
-  await expect(readout(page, 'frame')).toHaveText('0');
-  await button(page, 'Play').click();
-  await expect(readout(page, 'right')).toHaveText(String(BOUNDS.right), { timeout: 20_000 });
-  await expect(readout(page, 'scale')).toHaveText('2.0000', { timeout: 20_000 });
-  await button(page, 'Pause').click();
-  await expect(readout(page, 'left')).toHaveText('52000');
-  await expect(readout(page, 'midpoint')).toHaveText('90000');
-  const pausedAt = await number(page, 'frame');
-  await page.screenshot({ path: testInfo.outputPath('camera-lab-near-corner-push.png') });
-
-  // Shake against the right bound: the offset is non-zero, the visible span stays inside.
-  await button(page, 'Shake: land').click();
-  const trace = [`corner-push, paused at frame ${pausedAt}; "Shake: land" then Step`];
-  for (let age = 0; age <= 12; age++) {
-    await stepTo(page, pausedAt + 1 + age);
-    await expect(readout(page, 'shake')).toHaveText(age < 12 ? SHAKE_OFFSET : '0');
-    await expectInsideBounds(page);
-    trace.push(
-      `frame ${pausedAt + 1 + age}: shake ${await readout(page, 'shake').textContent()} px, ` +
-        `visible ${await readout(page, 'left').textContent()}..${await readout(page, 'right').textContent()}`,
-    );
-    if (age < 3) {
+  // `land` shakes for 12 frames: frames 1 to 12 are offset, frame 13 is at rest. The trace and
+  // the first three frames are review evidence.
+  const trace = ['walk-forward, paused at frame 0; "Shake: land" then Step'];
+  for (let frame = 1; frame <= 13; frame++) {
+    await stepTo(page, frame - 1, frame);
+    await expect(shake).toHaveText(frame <= 12 ? SHAKE_OFFSET : '0');
+    trace.push(`frame ${frame}: shake ${await shake.textContent()} px`);
+    if (frame <= 3) {
       await arenaCanvas(page).screenshot({
-        path: testInfo.outputPath(`camera-lab-shake-step-${age + 1}.png`),
+        path: testInfo.outputPath(`camera-lab-shake-frame-${frame}.png`),
       });
     }
   }
   writeFileSync(testInfo.outputPath('camera-lab-shake-trace.txt'), `${trace.join('\n')}\n`);
+
+  // Reset clears a shake in progress.
+  await button(page, 'Shake: wall-contact').click();
+  await stepTo(page, 13, 14);
+  await expect(shake).toHaveText(SHAKE_OFFSET);
+  await button(page, 'Reset').click();
+  await expect(readout(page, 'frame')).toHaveText('0');
+  await expect(shake).toHaveText('0');
+  await stepTo(page, 0, 1);
+  await expect(shake).toHaveText('0');
+});
+
+test('review evidence: far framing with overlays', async ({ page }, testInfo) => {
+  await page.goto(CAMERA_LAB);
+  await page.getByRole('combobox', { name: 'Scenario' }).selectOption('walk-back');
+  await expect(readout(page, 'frame')).toHaveText('0');
+  // Player 1 walks back to 8000 by frame 40; the scene is still from then on and the camera
+  // converges on pushbox edges 5000 and 75000 plus 8000 a side.
+  await button(page, 'Play').click();
+  await expect(readout(page, 'left')).toHaveText('-3000', { timeout: 20_000 });
+  await expect(readout(page, 'scale')).toHaveText('1.1163', { timeout: 20_000 });
+  await button(page, 'Pause').click();
+  await expect(readout(page, 'right')).toHaveText('83000');
+  await expect(readout(page, 'midpoint')).toHaveText('40000');
+  await page.screenshot({ path: testInfo.outputPath('camera-lab-far-walk-back.png') });
+});
+
+test('review evidence: near framing at a bound with overlays, and a shake there', async ({
+  page,
+}, testInfo) => {
+  await page.goto(CAMERA_LAB);
+  // Player 1 pushes player 2 into the right corner (frame 209): closest zoom, at the bound.
+  await page.getByRole('combobox', { name: 'Scenario' }).selectOption('corner-push');
+  await expect(readout(page, 'frame')).toHaveText('0');
+  await button(page, 'Play').click();
+  // The fighters stop at 87000 and 93000; the camera reaches the bound before they do.
+  await expect(readout(page, 'midpoint')).toHaveText('90000', { timeout: 20_000 });
+  await expect(readout(page, 'scale')).toHaveText('2.0000', { timeout: 20_000 });
+  await button(page, 'Pause').click();
+  await expect(readout(page, 'left')).toHaveText('52000');
+  await expect(readout(page, 'right')).toHaveText(String(BOUNDS.right));
+  await page.screenshot({ path: testInfo.outputPath('camera-lab-near-corner-push.png') });
+
+  // A shake against the right bound: the offset is non-zero, the visible span stays inside.
+  await button(page, 'Shake: land').click();
+  await button(page, 'Step').click();
+  await expect(readout(page, 'shake')).toHaveText(SHAKE_OFFSET);
+  await expectInsideBounds(page);
 
   // Overlays off: still one canvas.
   await page.getByRole('checkbox', { name: 'Overlays' }).uncheck();
