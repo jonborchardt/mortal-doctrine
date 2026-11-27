@@ -9,6 +9,7 @@ const SQRT2 = Math.SQRT2;
 function close(actual: object | undefined, expected: Transform | Vec2, label: string) {
   expect(actual, label).toBeDefined();
   for (const [field, value] of Object.entries(expected)) {
+    // A field missing from `actual` compares as NaN, which fails the tolerance check below.
     const got = (actual as Record<string, number>)[field];
     expect(
       Math.abs((got ?? NaN) - value),

@@ -156,12 +156,11 @@ export function loadRig(data: unknown): Rig {
 
   const roots = rig.bones.filter((bone) => bone.parent === undefined);
   if (roots.length !== 1) {
-    const found = roots.map((bone) => `"${bone.id}"`).join(', ');
-    problems.push(
-      `expected exactly one root bone (a bone with no parent), found ${roots.length}${found && `: ${found}`}`,
-    );
+    const ids = roots.map((bone) => `"${bone.id}"`).join(', ');
+    const found = roots.length === 0 ? '0' : `${roots.length}: ${ids}`;
+    problems.push(`expected exactly one root bone (a bone with no parent), found ${found}`);
   }
-  const depths = new Map<string, number>();
+  const ranked: { readonly bone: (typeof rig.bones)[number]; readonly depth: number }[] = [];
   for (const bone of rig.bones) {
     let depth = 0;
     for (let current = bone; current.parent !== undefined; depth++) {
@@ -178,7 +177,7 @@ export function loadRig(data: unknown): Rig {
       }
       current = parent;
     }
-    depths.set(bone.id, depth);
+    ranked.push({ bone, depth });
   }
 
   const drawOrders = new Map<number, string>();
@@ -214,11 +213,12 @@ export function loadRig(data: unknown): Rig {
   }
   if (problems.length > 0) throw new Error(`Invalid rig "${rig.id}": ${problems.join('; ')}`);
 
-  const depthOf = (id: string) => depths.get(id) ?? 0;
   return {
     id: rig.id,
-    bones: rig.bones
-      .map((bone) => ({
+    // Parents before children: by depth, keeping the authored order within a depth.
+    bones: ranked
+      .sort((a, b) => a.depth - b.depth)
+      .map(({ bone }) => ({
         id: bone.id,
         parent: bone.parent ?? null,
         rest: {
@@ -227,8 +227,7 @@ export function loadRig(data: unknown): Rig {
           scale: bone.scale,
         },
         length: bone.length,
-      }))
-      .sort((a, b) => depthOf(a.id) - depthOf(b.id)),
+      })),
     slots: rig.slots
       .map((slot) => ({ ...slot, attachment: slot.attachment ?? null }))
       .sort((a, b) => a.drawOrder - b.drawOrder),
