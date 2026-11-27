@@ -293,6 +293,11 @@ character origin each frame; the renderable evaluates the rig, orders the slots,
 texture (id = attachment id) with a Pixi-free transform function. It owns the textures it is
 given and releases them on `destroy`.
 
+**Audio (implemented, `@mortal-doctrine/audio`).** A Zod-validated cue registry binds event
+`type`s to cues on an SFX, voice or music bus; an injected-`AudioContext` player consumes event
+arrays and plays each event identity once (bounded dedupe window), so restores and replays do not
+re-trigger sounds. Playback unlocks on the first user gesture. See the package README.
+
 The 960×540 viewport and the 2× texture resolution are **defaults, not architectural
 constraints**. No code may assume the logical viewport equals the arena width.
 
