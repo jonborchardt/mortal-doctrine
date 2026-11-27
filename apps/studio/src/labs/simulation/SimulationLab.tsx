@@ -278,7 +278,7 @@ function formatHistory(history: readonly InputFrame[]): string {
 }
 
 function formatEvent(event: SimulationEvent): string {
-  return `frame ${event.frame}: ${event.type} P${event.player + 1} ${event.side}`;
+  return `frame ${event.frame}: ${event.type} P${event.player + 1} ${event.type === 'command' ? event.command : event.side}`;
 }
 
 /** Pretty JSON with number arrays (input history) kept on one line. */

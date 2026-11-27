@@ -489,7 +489,7 @@ describe('hashState', () => {
   });
 
   it('matches the pinned value, so a change to state serialization is noticed', () => {
-    expect(hashState(initial)).toBe('8dd5e71f');
-    expect(hashState(later)).toBe('d425bf38');
+    expect(hashState(initial)).toBe('58bc5552');
+    expect(hashState(later)).toBe('9d2dc23d');
   });
 });

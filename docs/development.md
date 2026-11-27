@@ -100,6 +100,9 @@ Character APIs do not exist yet (M2–M3). The fixed parts:
 - The Input Lab (`/labs/input`) shows, per player, raw device state (held keys, gamepad buttons
   and stick), presses latched for the next tick, the frames sampled each tick, and a log of
   latched taps. Pause and Step make single ticks observable.
+- The Command Lab (`/labs/commands`) plays a scripted fixture (or live input) through `step` with
+  the generic commands and shows the frame, each player's facing and input timeline, and the
+  recognized commands with frame numbers. Pause and Step make single ticks observable.
 - Diagnostics are measured by the host app around simulation calls; the simulation itself never
   reads clocks.
 - `pnpm bench` runs headless Vitest benchmarks (`tests/*.bench.ts`). Compare results only on the
