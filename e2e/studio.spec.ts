@@ -59,7 +59,7 @@ test('pauses, steps one frame, resets and resumes the simulation', async ({ page
 
   await page.getByRole('button', { name: 'Reset' }).click();
   await expect(frame).toHaveText('0');
-  await expect(state).toContainText('"x": 240');
+  await expect(state).toContainText('"x": 24000');
   await page.getByRole('button', { name: 'Step' }).click();
   await expect(frame).toHaveText('1');
 
@@ -71,10 +71,57 @@ test('step applies held keyboard input to player one', async ({ page }) => {
   await page.goto(SIMULATION_LAB);
   await pausedAt(page);
   await page.getByRole('button', { name: 'Reset' }).click();
-  await expect(page.getByTestId('sim-state')).toContainText('"x": 240');
+  await expect(page.getByTestId('sim-state')).toContainText('"x": 24000');
 
   await page.keyboard.down('KeyD');
   await page.getByRole('button', { name: 'Step' }).click();
   await page.keyboard.up('KeyD');
-  await expect(page.getByTestId('sim-state')).toContainText('"x": 244');
+  await expect(page.getByTestId('sim-state')).toContainText('"x": 24400');
+});
+
+test('shows seed, RNG state, raw input history and boundary-contact events; Reset clears them', async ({
+  page,
+}) => {
+  await page.goto(SIMULATION_LAB);
+  await pausedAt(page);
+  await page.getByRole('button', { name: 'Reset' }).click();
+  const frame = page.getByTestId('sim-frame');
+  const seed = page.getByTestId('sim-seed');
+  const rng = page.getByTestId('sim-rng');
+  const history = page.getByTestId('input-history-p1');
+  const events = page.getByTestId('sim-events').getByRole('listitem');
+  await expect(frame).toHaveText('0');
+  await expect(seed).toHaveText(/^\d+$/);
+  const initialSeed = await seed.textContent();
+  await expect(rng).toHaveText(/^-?\d+$/);
+  const initialRng = await rng.textContent();
+  await expect(history).toBeEmpty();
+  await expect(events).toHaveCount(0);
+
+  // Player one starts at x 240 and walks 4 per tick: the 53rd step (frame 52) reaches the edge.
+  const step = page.getByRole('button', { name: 'Step' });
+  await page.keyboard.down('KeyA');
+  for (let i = 0; i < 53; i++) await step.click();
+  await page.keyboard.up('KeyA');
+  await expect(frame).toHaveText('53');
+  await expect(history).toContainText('←');
+  await expect(events).toHaveCount(1);
+  await expect(events.first()).toHaveText('frame 52: boundary-contact P1 left');
+
+  // Holding several keys while single-stepping records the raw frame, opposing directions kept.
+  await page.keyboard.down('KeyD');
+  await page.keyboard.down('ArrowLeft');
+  await page.keyboard.down('KeyU');
+  await step.click();
+  await page.keyboard.up('KeyU');
+  await page.keyboard.up('ArrowLeft');
+  await page.keyboard.up('KeyD');
+  await expect(history).toContainText(/← ←→1$/);
+
+  await page.getByRole('button', { name: 'Reset' }).click();
+  await expect(frame).toHaveText('0');
+  await expect(seed).toHaveText(initialSeed ?? '');
+  await expect(rng).toHaveText(initialRng ?? '');
+  await expect(history).toBeEmpty();
+  await expect(events).toHaveCount(0);
 });

@@ -1,10 +1,12 @@
 # @mortal-doctrine/renderer
 
-**Layer:** `presentation` · **May depend on:** `simulation` (read-only state types and constants),
-lower layers, `pixi.js`.
+**Layer:** `presentation` · **May depend on:** `simulation` (read-only state types, `FIGHTER_WIDTH`),
+`sim-core` (`SUBUNITS_PER_UNIT`), lower layers, `pixi.js`.
 
 Draws simulation snapshots with PixiJS: placeholder arena floor and two fighter rectangles.
 Owns the Pixi application, its ticker (display-rate frame callbacks) and frame diagnostics.
+It owns its 960×540 logical viewport and converts simulation sub-units to logical pixels by
+dividing by `SUBUNITS_PER_UNIT` (1 world unit = 1 logical pixel).
 
 **Non-goals:** game logic, input, React, mutating simulation state. Skeletal rendering, effects
 and camera belong to future packages.
@@ -26,7 +28,7 @@ import { createArenaRenderer } from '@mortal-doctrine/renderer';
 
 const renderer = await createArenaRenderer(hostElement);
 const stop = renderer.onFrame((elapsedMs) => {
-  runner.advance(elapsedMs, inputs());
+  runner.advance(elapsedMs, () => inputs());
   renderer.render(runner.state);
 });
 // teardown:

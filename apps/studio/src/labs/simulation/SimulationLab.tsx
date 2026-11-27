@@ -2,23 +2,37 @@ import { useEffect, useRef, useState } from 'react';
 import { createKeyboardInput, type KeyboardInput } from '@mortal-doctrine/input';
 import { createArenaRenderer } from '@mortal-doctrine/renderer';
 import {
-  createSimulationRunner,
+  InputBit,
   NEUTRAL_INPUT,
   TICK_RATE,
   type FrameInputs,
+  type InputFrame,
+} from '@mortal-doctrine/sim-core';
+import {
+  createSimulationRunner,
+  type InitialStateOptions,
+  type SimulationEvent,
   type SimulationRunner,
 } from '@mortal-doctrine/simulation';
+
+// Deterministic fixture the lab starts from and Reset returns to.
+const LAB_OPTIONS = { seed: 12345 } as const satisfies InitialStateOptions;
+const HISTORY_SHOWN = 16;
+const EVENTS_KEPT = 50;
 
 interface Session {
   readonly runner: SimulationRunner;
   readonly keyboard: KeyboardInput;
+  /** Recent events, oldest first (shown newest first). Mutated by the loop and controls, never React state. */
+  readonly log: SimulationEvent[];
 }
 
-type Readout = 'frame' | 'state' | 'fps' | 'tps' | 'simMs' | 'frameMs';
+type Readout = 'frame' | 'state' | 'fps' | 'tps' | 'simMs' | 'frameMs' | 'rng' | 'p1' | 'p2';
 
 export function SimulationLab() {
   const rootRef = useRef<HTMLElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
+  const eventsRef = useRef<HTMLOListElement>(null);
   const sessionRef = useRef<Session | null>(null);
   const [ready, setReady] = useState(false);
   const [paused, setPaused] = useState(false);
@@ -27,16 +41,18 @@ export function SimulationLab() {
   useEffect(() => {
     const host = hostRef.current;
     const root = rootRef.current;
-    if (!host || !root) return;
+    const eventList = eventsRef.current;
+    if (!host || !root || !eventList) return;
     let disposed = false;
     let teardown = () => {};
 
     createArenaRenderer(host)
       .then((renderer) => {
         if (disposed) return renderer.destroy();
-        const runner = createSimulationRunner();
+        const runner = createSimulationRunner(LAB_OPTIONS);
         const keyboard = createKeyboardInput(window);
-        sessionRef.current = { runner, keyboard };
+        const session: Session = { runner, keyboard, log: [] };
+        sessionRef.current = session;
         const readouts = new Map(
           [...root.querySelectorAll<HTMLElement>('[data-readout]')].map((el) => [
             el.dataset.readout,
@@ -48,12 +64,14 @@ export function SimulationLab() {
         // Measured tick rate over a rolling one-second window of display time.
         let windowMs = 0;
         let windowTicks = 0;
+        let shownLog = '';
 
         // Per-frame work stays outside React; React only handles control clicks.
         const unsubscribe = renderer.onFrame((elapsedMs) => {
           const started = performance.now();
-          const ticks = runner.advance(elapsedMs, inputsFrom(keyboard));
+          const { ticks, events } = runner.advance(elapsedMs, () => inputsFrom(keyboard));
           const simMs = performance.now() - started;
+          record(session, events);
           renderer.render(runner.state);
 
           windowMs += elapsedMs;
@@ -63,11 +81,27 @@ export function SimulationLab() {
             windowMs = 0;
             windowTicks = 0;
           }
-          write('frame', String(runner.state.frame));
-          write('state', JSON.stringify(runner.state, null, 2));
+          const { state } = runner;
+          write('frame', String(state.frame));
+          write('state', formatState(state));
+          write('rng', String(state.rng.state));
+          write('p1', formatHistory(state.input.history[0]));
+          write('p2', formatHistory(state.input.history[1]));
           write('fps', Math.round(renderer.fps).toString());
           write('simMs', simMs.toFixed(3));
           write('frameMs', renderer.frameCpuMs.toFixed(2));
+
+          const logText = session.log.map(formatEvent).join('\n');
+          if (logText !== shownLog) {
+            shownLog = logText;
+            eventList.replaceChildren(
+              ...session.log.toReversed().map((event) => {
+                const item = document.createElement('li');
+                item.textContent = formatEvent(event);
+                return item;
+              }),
+            );
+          }
         });
 
         setReady(true);
@@ -102,8 +136,18 @@ export function SimulationLab() {
       if (runner.paused) runner.resume();
       else runner.pause();
     });
-  const stepFrame = () => control(({ runner, keyboard }) => runner.stepOnce(inputsFrom(keyboard)));
-  const reset = () => control(({ runner }) => runner.reset());
+  const stepFrame = () =>
+    control((session) =>
+      record(
+        session,
+        session.runner.stepOnce(() => inputsFrom(session.keyboard)),
+      ),
+    );
+  const reset = () =>
+    control(({ runner, log }) => {
+      runner.reset();
+      log.length = 0;
+    });
 
   const buttonClass =
     'rounded bg-neutral-800 px-3 py-1 text-sm hover:bg-neutral-700 disabled:opacity-40';
@@ -132,8 +176,11 @@ export function SimulationLab() {
           Reset
         </button>
       </div>
+      <h2 id="sim-diagnostics" className="text-sm text-neutral-400">
+        Diagnostics
+      </h2>
       <dl
-        aria-label="Diagnostics"
+        aria-labelledby="sim-diagnostics"
         className="grid w-fit grid-cols-[auto_auto] gap-x-4 font-mono text-xs text-neutral-400"
       >
         <dt>Target tick rate</dt>
@@ -146,6 +193,22 @@ export function SimulationLab() {
         <dd data-readout="simMs" />
         <dt>Frame CPU (ms)</dt>
         <dd data-readout="frameMs" />
+        <dt>Seed</dt>
+        <dd data-testid="sim-seed">{LAB_OPTIONS.seed}</dd>
+        <dt>RNG state (no draws yet)</dt>
+        <dd data-testid="sim-rng" data-readout="rng" />
+      </dl>
+      <h2 id="sim-input-history" className="text-sm text-neutral-400">
+        Input history
+      </h2>
+      <dl
+        aria-labelledby="sim-input-history"
+        className="grid w-fit grid-cols-[auto_auto] gap-x-4 font-mono text-xs text-neutral-400"
+      >
+        <dt>P1 (last {HISTORY_SHOWN} frames, oldest → newest)</dt>
+        <dd data-testid="input-history-p1" data-readout="p1" />
+        <dt>P2 (last {HISTORY_SHOWN} frames, oldest → newest)</dt>
+        <dd data-testid="input-history-p2" data-readout="p2" />
       </dl>
       <div className="flex flex-wrap items-start gap-4">
         <div ref={hostRef} data-testid="arena" className="w-full max-w-[960px]" />
@@ -153,10 +216,24 @@ export function SimulationLab() {
           data-readout="state"
           data-testid="sim-state"
           aria-label="Simulation state"
-          className="min-w-64 rounded bg-neutral-900 p-3 font-mono text-xs"
+          className="min-w-64 max-w-full overflow-x-auto rounded bg-neutral-900 p-3 font-mono text-xs"
         />
+        <section
+          aria-label="Event log"
+          className="min-w-64 rounded bg-neutral-900 p-3 font-mono text-xs"
+        >
+          <h2 className="mb-1 text-neutral-400">Events (newest first, last {EVENTS_KEPT})</h2>
+          <ol
+            ref={eventsRef}
+            data-testid="sim-events"
+            className="max-h-96 space-y-0.5 overflow-y-auto"
+          />
+        </section>
       </div>
-      <p className="text-sm text-neutral-500">Player 1: ← → or A / D. Step uses held keys.</p>
+      <p className="text-sm text-neutral-400">
+        Player 1: ← → or A / D (↑ ↓ or W / S and buttons U I O J K L are recorded only). Step uses
+        held keys.
+      </p>
       {error && <p className="text-red-400">Renderer failed: {error}</p>}
     </section>
   );
@@ -164,6 +241,48 @@ export function SimulationLab() {
 
 function inputsFrom(keyboard: KeyboardInput): FrameInputs {
   return [keyboard.read(), NEUTRAL_INPUT];
+}
+
+function record(session: Session, events: readonly SimulationEvent[]) {
+  session.log.push(...events);
+  session.log.splice(0, Math.max(0, session.log.length - EVENTS_KEPT));
+}
+
+const GLYPHS: readonly [number, string][] = [
+  [InputBit.LEFT, '←'],
+  [InputBit.RIGHT, '→'],
+  [InputBit.UP, '↑'],
+  [InputBit.DOWN, '↓'],
+  [InputBit.A1, '1'],
+  [InputBit.A2, '2'],
+  [InputBit.A3, '3'],
+  [InputBit.A4, '4'],
+  [InputBit.A5, '5'],
+  [InputBit.A6, '6'],
+];
+
+/** Raw frames as glyphs (opposing directions shown as recorded); `·` is neutral. */
+function formatHistory(history: readonly InputFrame[]): string {
+  return history
+    .slice(-HISTORY_SHOWN)
+    .map(
+      (frame) =>
+        GLYPHS.filter(([bit]) => frame & bit)
+          .map(([, glyph]) => glyph)
+          .join('') || '·',
+    )
+    .join(' ');
+}
+
+function formatEvent(event: SimulationEvent): string {
+  return `frame ${event.frame}: ${event.type} P${event.player + 1} ${event.side}`;
+}
+
+/** Pretty JSON with number arrays (input history) kept on one line. */
+function formatState(state: unknown): string {
+  return JSON.stringify(state, null, 2).replace(/\[[\d\s,-]*\]/g, (array) =>
+    array.replace(/\s+/g, ''),
+  );
 }
 
 function setText(element: HTMLElement | null | undefined, text: string) {

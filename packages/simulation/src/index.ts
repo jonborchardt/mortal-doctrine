@@ -1,14 +1,19 @@
-export { ARENA_WIDTH, FIGHTER_WIDTH, TICK_MS, TICK_RATE, WALK_SPEED } from './constants';
+export { ARENA_WIDTH, FIGHTER_WIDTH, WALK_SPEED } from './constants';
+export type { BoundaryContactEvent, FighterState } from './fighters';
+export { DEFAULT_HISTORY_CAPACITY, MAX_HISTORY_CAPACITY } from './input';
 export {
   createInitialState,
   deserializeState,
-  NEUTRAL_INPUT,
+  SCHEMA_VERSION,
   serializeState,
   simulationStateSchema,
-  type FighterState,
-  type FrameInputs,
-  type PlayerInput,
+  type InitialStateOptions,
   type SimulationState,
 } from './state';
-export { step } from './step';
-export { createSimulationRunner, type SimulationRunner } from './runner';
+export { step, type SimulationEvent, type StepResult } from './step';
+export {
+  createSimulationRunner,
+  type AdvanceResult,
+  type InputProvider,
+  type SimulationRunner,
+} from './runner';

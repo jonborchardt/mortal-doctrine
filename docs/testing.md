@@ -25,16 +25,19 @@ public entry points (`src/index.ts`, `src/testing.ts`), not internal files.
 
 Every simulation-layer subsystem must show:
 
-1. Identical state + inputs ⇒ identical serialized state over a long scripted run.
-2. Serialize mid-run → restore → continue equals an uninterrupted run.
+1. Identical state + inputs ⇒ identical serialized state and identical events over a long
+   scripted run.
+2. Serialize mid-run → restore → continue equals an uninterrupted run, in state and events.
 3. Operations never mutate their input state.
 
 ## Fixtures
 
 - Packages publish reusable fixtures from `src/testing.ts`, exported as
   `@mortal-doctrine/<pkg>/testing`. Production code never imports `testing`.
-- Simulation fixtures today: `IDLE`, `P1_RIGHT`, `P1_LEFT`, `walkCycleScript` (an `InputScript`
-  mapping absolute frame → inputs) and `runFrames(state, script, count)`.
+- Simulation fixtures today: `held(...bits)` (builds an `InputFrame`), `IDLE`, `P1_RIGHT`,
+  `P1_LEFT`, `SEEDED_OPTIONS` (non-default seed and history capacity), `walkCycleScript` (an
+  `InputProvider` mapping absolute frame → `FrameInputs`) and
+  `runFrames(state, script, count) → { state, events }`.
 - Keep fixtures small, readable and built from public APIs. Before production characters exist,
   use geometric placeholders and reference mannequins (future: a minimal test rig in the skeleton
   package), never production content.
