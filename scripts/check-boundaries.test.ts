@@ -1,7 +1,11 @@
+import { Linter } from 'eslint';
 import { describe, expect, it } from 'vitest';
 import {
   bareImports,
   checkWorkspace,
+  determinismLintConfig,
+  loadWorkspace,
+  parseJsonc,
   type Manifest,
   type WorkspacePackage,
 } from './check-boundaries';
@@ -24,6 +28,7 @@ function pkg(
     dir,
     manifest,
     hasReadme: true,
+    tsconfig: { compilerOptions: {} },
     imports: imports.map((specifier) => ({ specifier, file: 'src/index.ts' })),
   };
 }
@@ -110,5 +115,98 @@ describe('bareImports', () => {
       'side-effect',
       'pixi.js',
     ]);
+  });
+});
+
+describe('determinism rules by layer', () => {
+  // In-memory fixtures: a real package.json under packages/ would join the pnpm workspace.
+  const simulationFixture = pkg('packages/new-sim', 'simulation');
+  const presentationFixture = pkg('packages/new-view', 'presentation');
+  const config = determinismLintConfig([simulationFixture, presentationFixture], []);
+
+  it('covers packages declared foundation, simulation or animation and nothing else', () => {
+    const config = determinismLintConfig(
+      [
+        pkg('packages/a', 'foundation'),
+        simulationFixture,
+        pkg('packages/c', 'animation'),
+        presentationFixture,
+        pkg('characters/monk', 'content'),
+        pkg('apps/game', 'application'),
+      ],
+      [],
+    );
+    expect(config.files).toEqual(['packages/a/**', 'packages/new-sim/**', 'packages/c/**']);
+  });
+
+  it('forbids clocks, Math.random, pixi.js, React and node: imports in a new simulation package', () => {
+    const source = [
+      "import { Application } from 'pixi.js';",
+      "import { useState } from 'react';",
+      "import { createRoot } from 'react-dom/client';",
+      "import { readFileSync } from 'node:fs';",
+      'export const t = Date.now() + performance.now() + Math.random();',
+      'export const used = [Application, useState, createRoot, readFileSync];',
+    ].join('\n');
+    const lint = (filename: string) =>
+      new Linter({ cwd: '/repo' }).verify(
+        source,
+        [{ languageOptions: { sourceType: 'module' } }, config],
+        { filename: `/repo/${filename}` },
+      );
+
+    const messages = lint('packages/new-sim/src/index.js');
+    expect(messages.map((m) => `${m.line}:${m.ruleId ?? ''}`)).toEqual([
+      '1:no-restricted-imports',
+      '2:no-restricted-imports',
+      '3:no-restricted-imports',
+      '4:no-restricted-imports',
+      '5:no-restricted-globals',
+      '5:no-restricted-globals',
+      '5:no-restricted-properties',
+    ]);
+    expect(lint('packages/new-view/src/index.js')).toEqual([]);
+  });
+
+  it('reports a DOM lib or ambient types in a deterministic package tsconfig', () => {
+    const domLib = pkg('packages/new-sim', 'simulation');
+    domLib.tsconfig = { compilerOptions: { lib: ['ES2023', 'DOM'] } };
+    const types = pkg('packages/new-anim', 'animation');
+    types.tsconfig = { compilerOptions: { types: ['node'] } };
+    const missing = pkg('packages/new-core', 'foundation');
+    missing.tsconfig = undefined;
+    const presentation = pkg('packages/new-view', 'presentation');
+    presentation.tsconfig = { compilerOptions: { lib: ['ES2023', 'DOM'], types: ['node'] } };
+    expect(checkWorkspace([domLib, types, missing, presentation])).toEqual([
+      'packages/new-sim: layer "simulation" must not include a DOM lib in tsconfig.json',
+      'packages/new-anim: layer "animation" must not declare ambient "types" in tsconfig.json',
+      'packages/new-core: layer "foundation" must have a tsconfig.json',
+    ]);
+  });
+
+  it('derives coverage of the real workspace from package.json layers', () => {
+    const workspace = loadWorkspace(process.cwd());
+    const { files } = determinismLintConfig(workspace, []);
+    expect(files).toContain('packages/sim-core/**');
+    expect(files).toContain('packages/simulation/**');
+    expect(files).not.toContain('packages/renderer/**');
+    expect(workspace.find((p) => p.dir === 'packages/simulation')?.tsconfig).toEqual({
+      extends: '../../tsconfig.base.json',
+      include: ['src', 'tests'],
+    });
+  });
+});
+
+describe('parseJsonc', () => {
+  it('accepts comments and trailing commas without touching strings', () => {
+    const text = `{
+      // line comment
+      "url": "http://example.test/*not a comment*/",
+      /* block */ "list": ["a,]", "b",],
+    }`;
+    expect(parseJsonc(text)).toEqual({
+      url: 'http://example.test/*not a comment*/',
+      list: ['a,]', 'b'],
+    });
   });
 });

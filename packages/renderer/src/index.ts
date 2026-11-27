@@ -1,7 +1,10 @@
 import { Application, Graphics, UPDATE_PRIORITY } from 'pixi.js';
-import { ARENA_WIDTH, FIGHTER_WIDTH, type SimulationState } from '@mortal-doctrine/simulation';
+import { SUBUNITS_PER_UNIT } from '@mortal-doctrine/sim-core';
+import { FIGHTER_WIDTH, type SimulationState } from '@mortal-doctrine/simulation';
 
-// Presentation-only dimensions: these never feed back into the simulation.
+// Presentation-only dimensions in logical pixels: these never feed back into the simulation.
+// One world unit (SUBUNITS_PER_UNIT simulation sub-units) is one logical pixel.
+const VIEW_WIDTH = 960;
 const VIEW_HEIGHT = 540;
 const FLOOR_Y = 460;
 const FIGHTER_HEIGHT = 140;
@@ -27,15 +30,16 @@ export interface ArenaRenderer {
 /** Creates a PixiJS view and appends its canvas to `host`. */
 export async function createArenaRenderer(host: HTMLElement): Promise<ArenaRenderer> {
   const app = new Application();
-  await app.init({ width: ARENA_WIDTH, height: VIEW_HEIGHT, background: BACKGROUND });
+  await app.init({ width: VIEW_WIDTH, height: VIEW_HEIGHT, background: BACKGROUND });
 
   const floor = new Graphics()
-    .rect(0, FLOOR_Y, ARENA_WIDTH, VIEW_HEIGHT - FLOOR_Y)
+    .rect(0, FLOOR_Y, VIEW_WIDTH, VIEW_HEIGHT - FLOOR_Y)
     .fill(FLOOR_COLOR);
   // Origin at the fighter's feet, matching the simulation's x coordinate.
+  const fighterWidth = FIGHTER_WIDTH / SUBUNITS_PER_UNIT;
   const fighters = FIGHTER_COLORS.map((color) =>
     new Graphics()
-      .rect(-FIGHTER_WIDTH / 2, -FIGHTER_HEIGHT, FIGHTER_WIDTH, FIGHTER_HEIGHT)
+      .rect(-fighterWidth / 2, -FIGHTER_HEIGHT, fighterWidth, FIGHTER_HEIGHT)
       .fill(color),
   );
   app.stage.addChild(floor, ...fighters);
@@ -57,7 +61,7 @@ export async function createArenaRenderer(host: HTMLElement): Promise<ArenaRende
   return {
     render(state) {
       state.fighters.forEach((fighter, index) => {
-        fighters[index]?.position.set(fighter.x, FLOOR_Y);
+        fighters[index]?.position.set(fighter.x / SUBUNITS_PER_UNIT, FLOOR_Y);
       });
     },
     onFrame(callback) {

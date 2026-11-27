@@ -9,36 +9,39 @@ convention deliberately, in this file, in the same change that needs it.
 All identifiers are lowercase ASCII kebab-case (`[a-z0-9]+(-[a-z0-9]+)*`), stable once shipped
 (they appear in saves, replays and asset paths), and never contain display text.
 
-| Kind       | Form                                                 | Example                            | Unique within |
-| ---------- | ---------------------------------------------------- | ---------------------------------- | ------------- |
-| Character  | `<character>`                                        | `monk`                             | game          |
-| Arena      | `<arena>`                                            | `temple-steps`                     | game          |
-| Move       | `<move>`; qualified `<character>/<move>`             | `palm-strike`, `monk/palm-strike`  | character     |
-| Animation  | `<animation>`; qualified `<character>/<animation>`   | `idle`, `monk/walk-forward`        | character     |
-| Bone       | `<bone>`                                             | `forearm-left`, `wing-right-2`     | rig           |
-| Attachment | `<attachment>`                                       | `robe-torso`, `halo`               | rig           |
-| Effect     | `<owner>/<effect>`, owner = `core` or a character id | `core/hit-spark`, `monk/chi-burst` | game          |
-| Studio lab | `<lab>` **(implemented)**                            | `simulation`                       | Studio        |
+| Kind       | Form                                                                                                                            | Example                            | Unique within |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | ------------- |
+| Character  | `<character>`                                                                                                                   | `monk`                             | game          |
+| Arena      | x ∈ [0, 96000] sub-units (960 world units) today **(implemented)**; arenas will define their own width; camera handles framing. |
+| Move       | `<move>`; qualified `<character>/<move>`                                                                                        | `palm-strike`, `monk/palm-strike`  | character     |
+| Animation  | `<animation>`; qualified `<character>/<animation>`                                                                              | `idle`, `monk/walk-forward`        | character     |
+| Bone       | `<bone>`                                                                                                                        | `forearm-left`, `wing-right-2`     | rig           |
+| Attachment | `<attachment>`                                                                                                                  | `robe-torso`, `halo`               | rig           |
+| Effect     | `<owner>/<effect>`, owner = `core` or a character id                                                                            | `core/hit-spark`, `monk/chi-burst` | game          |
+| Studio lab | `<lab>` **(implemented)**                                                                                                       | `simulation`                       | Studio        |
 
 Packages: `@mortal-doctrine/character-<id>` in `characters/<id>/`,
 `@mortal-doctrine/arena-<id>` in `arenas/<id>/` **(implemented in the boundary checker)**.
 
 ## Coordinates and units
 
-| Topic            | Convention                                                                                                                                                                        |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| World unit       | 1 unit = 1 logical pixel at the reference viewport. **(implemented)**                                                                                                             |
-| Numeric type     | Gameplay positions and velocities are integers **(implemented)**; sub-unit precision is an explicit M1 decision.                                                                  |
-| Gameplay axes    | +x right; +y **up**; y = 0 is the ground line. (Only x exists today.)                                                                                                             |
-| Screen axes      | Pixi/screen: +y **down**. Conversion happens only in presentation: `screenY = groundY − y`.                                                                                       |
-| Arena            | x ∈ [0, 960] today **(implemented)**; arenas will define their own width; camera handles framing.                                                                                 |
-| Facing           | `facing: 1` (right) or `-1` (left). All content is authored facing right; presentation and hit geometry mirror by `facing`.                                                       |
-| Character origin | Ground contact point, horizontally centered between the feet (bottom-center of the pushbox). **(implemented for placeholders)**                                                   |
-| Angles           | Degrees in authored content files; radians at runtime. Convert once in the loader. Positive = counter-clockwise in gameplay space (y-up).                                         |
-| Logical viewport | Default 960 × 540 (16:9) **(implemented, hard-coded today)**, scaled to the canvas host by CSS. A configurable default, not a constraint: never assume it equals the arena width. |
-| Rendering scale  | Default: textures authored at 2× the logical resolution for high-DPI displays. Configurable per asset manifest once asset loading exists.                                         |
-| Gameplay time    | Integer frames at 60 Hz **(implemented)**. Move frame data (startup/active/recovery) is in frames.                                                                                |
-| Animation time   | Keyframe times in integer frames at 60 Hz; presentation may interpolate between them and between ticks. Animation never drives gameplay timing.                                   |
+| Topic            | Convention                                                                                                                                                                                                                                                                         |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| World unit       | 1 unit = 1 logical pixel at the reference viewport. **(implemented)**                                                                                                                                                                                                              |
+| Sub-units        | `SUBUNITS_PER_UNIT = 100` integer sub-units per world unit, defined once in `@mortal-doctrine/sim-core`. Positions, sizes and distances are sub-units; velocities sub-units per frame; accelerations sub-units per frame². **(implemented)**                                       |
+| Numeric type     | Integers only; simulation state never stores a float. Every stored value is in the signed 32-bit range [−2,147,483,648, 2,147,483,647] sub-units (about ±21.4 million world units), enforced by the state schema. **(implemented)**                                                |
+| Intermediates    | Products and other intermediates must stay within `Number.MAX_SAFE_INTEGER`; the checked helpers (`scaleRatio`) throw a descriptive error rather than return an inexact value. **(implemented)**                                                                                   |
+| Rounding         | Division and ratio scaling (`divTrunc`, `scaleRatio`) truncate toward zero, so `f(−x) === −f(x)` and mirrored fighters behave identically. Friction is `decelerate` (clamped at zero) or a bounded `scaleRatio`; acceleration and gravity are integer additions. **(implemented)** |
+| Gameplay axes    | +x right; +y **up**; y = 0 is the ground line. (Only x exists today.)                                                                                                                                                                                                              |
+| Screen axes      | Pixi/screen: +y **down**. Conversion happens only in presentation: `screenY = groundY − y`.                                                                                                                                                                                        |
+| Arena            | x ∈ [0, 960] today **(implemented)**; arenas will define their own width; camera handles framing.                                                                                                                                                                                  |
+| Facing           | `facing: 1` (right) or `-1` (left). All content is authored facing right; presentation and hit geometry mirror by `facing`.                                                                                                                                                        |
+| Character origin | Ground contact point, horizontally centered between the feet (bottom-center of the pushbox). **(implemented for placeholders)**                                                                                                                                                    |
+| Angles           | Degrees in authored content files; radians at runtime. Convert once in the loader. Positive = counter-clockwise in gameplay space (y-up).                                                                                                                                          |
+| Logical viewport | Default 960 × 540 (16:9) **(implemented, hard-coded today)**, scaled to the canvas host by CSS. A configurable default, not a constraint: never assume it equals the arena width.                                                                                                  |
+| Rendering scale  | Default: textures authored at 2× the logical resolution for high-DPI displays. Configurable per asset manifest once asset loading exists.                                                                                                                                          |
+| Gameplay time    | Integer frames at 60 Hz **(implemented)**. Move frame data (startup/active/recovery) is in frames.                                                                                                                                                                                 |
+| Animation time   | Keyframe times in integer frames at 60 Hz; presentation may interpolate between them and between ticks. Animation never drives gameplay timing.                                                                                                                                    |
 
 ## Skeletons are per-character
 

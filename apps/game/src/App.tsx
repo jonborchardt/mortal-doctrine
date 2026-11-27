@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createKeyboardInput } from '@mortal-doctrine/input';
-import { createSimulationRunner, NEUTRAL_INPUT } from '@mortal-doctrine/simulation';
+import { NEUTRAL_INPUT, SUBUNITS_PER_UNIT } from '@mortal-doctrine/sim-core';
+import { createSimulationRunner } from '@mortal-doctrine/simulation';
 
 export function App() {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -25,11 +26,12 @@ export function App() {
 
         // The per-frame loop lives outside React: HUD text is written directly, never via state.
         const unsubscribe = renderer.onFrame((elapsedMs) => {
-          runner.advance(elapsedMs, [keyboard.read(), NEUTRAL_INPUT]);
+          // Sampled once per simulation tick; player two is idle until a second device exists.
+          runner.advance(elapsedMs, () => [keyboard.read(), NEUTRAL_INPUT]);
           renderer.render(runner.state);
           setText(frameRef.current, String(runner.state.frame));
           setText(fpsRef.current, String(Math.round(renderer.fps)));
-          setText(p1Ref.current, String(runner.state.fighters[0].x));
+          setText(p1Ref.current, String(runner.state.fighters[0].x / SUBUNITS_PER_UNIT));
         });
 
         teardown = () => {
