@@ -4,9 +4,9 @@
 
 Plays declarative keyframed clips on rigs: validates clip data, samples a clip at a time into a
 pose for `@mortal-doctrine/rig`, blends two poses by a weight, and runs an ordered list of pose
-stages. Pure and headless: no DOM, Pixi, React or Node APIs. Nothing here knows a bone name.
+stages, one of which applies pose constraints (two-bone IK, aim, angle limits). Pure and headless: no DOM, Pixi, React or Node APIs. Nothing here knows a bone name.
 
-**Non-goals:** IK and constraints (M1.09), skinning (M1.16), Pixi drawing (M1.10), state machines,
+**Non-goals:** multi-bone IK solvers (FABRIK, CCD), physics and springs, skinning (M1.16), Pixi drawing (M1.10), state machines,
 clip queues, additive layers, masks, named easing presets, a clip file format on disk, validating
 a clip against a rig at load time, animation-driven gameplay events.
 
@@ -15,21 +15,26 @@ math: never feed them into simulation state.
 
 ## API
 
-| Export                                   | Purpose                                                                                        |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `clipDataSchema`, `ClipData`             | Zod schema and authored type of a clip (degrees), `schemaVersion: 1`                           |
-| `CLIP_SCHEMA_VERSION`                    | The supported `schemaVersion` (`1`)                                                            |
-| `loadClip(data)`                         | Validates `ClipData` and returns a runtime `Clip` (radians); throws listing problems           |
-| `key(frame, value, interpolation?)`      | Authoring helper: one key                                                                      |
-| `defineClip(id, duration, content)`      | Authoring helper: `ClipData` with the current `schemaVersion`; `loop` defaults off             |
-| `sample(clip, time)`                     | The pose at `time` (frames at 60 Hz, fractions allowed)                                        |
-| `blend(rig, a, b, weight)`               | Pose `a` blended toward pose `b`                                                               |
-| `PoseStage`, `runPipeline(rig, pose, s)` | A stage is `(rig, pose) => pose`; the pipeline applies stages in list order                    |
-| `blendStage(other, weight)`              | The blend layer as a stage                                                                     |
-| `orderSlots(slots, drawOrder)`           | Applies a pose's draw order to `evaluate(...).slots`                                           |
-| `AnimatedPose`                           | Rig `Pose` plus optional `drawOrder` (slot ids, back to front)                                 |
-| `Clip`, `Key`, `Interpolation`           | Runtime types (radians)                                                                        |
-| `@mortal-doctrine/animation/testing`     | `WALK_CYCLE`, `RAISE_STAFF` (mannequin), `WING_FLAP` (non-humanoid), `INVALID_CLIPS`, `SMOOTH` |
+| Export                                     | Purpose                                                                                          |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| `clipDataSchema`, `ClipData`               | Zod schema and authored type of a clip (degrees), `schemaVersion: 1`                             |
+| `CLIP_SCHEMA_VERSION`                      | The supported `schemaVersion` (`1`)                                                              |
+| `loadClip(data)`                           | Validates `ClipData` and returns a runtime `Clip` (radians); throws listing problems             |
+| `key(frame, value, interpolation?)`        | Authoring helper: one key                                                                        |
+| `defineClip(id, duration, content)`        | Authoring helper: `ClipData` with the current `schemaVersion`; `loop` defaults off               |
+| `sample(clip, time)`                       | The pose at `time` (frames at 60 Hz, fractions allowed)                                          |
+| `blend(rig, a, b, weight)`                 | Pose `a` blended toward pose `b`                                                                 |
+| `PoseStage`, `runPipeline(rig, pose, s)`   | A stage is `(rig, pose) => pose`; the pipeline applies stages in list order                      |
+| `blendStage(other, weight)`                | The blend layer as a stage                                                                       |
+| `constraintsDataSchema`, `ConstraintsData` | Zod schema and authored type of a constraint list (degrees), `schemaVersion: 1`                  |
+| `loadConstraints(data)`                    | Validates `ConstraintsData` and returns runtime `Constraints` (radians); throws listing problems |
+| `constraintStage(rig, constraints)`        | The constraint stage for a rig; throws when the constraints do not fit the rig                   |
+| `orderSlots(slots, drawOrder)`             | Applies a pose's draw order to `evaluate(...).slots`                                             |
+| `AnimatedPose`                             | Rig `Pose` plus optional `drawOrder` (slot ids, back to front)                                   |
+| `Clip`, `Key`, `Interpolation`             | Runtime types (radians)                                                                          |
+| `Constraints`                              | Runtime type of a constraint list (radians)                                                      |
+| `@mortal-doctrine/animation/testing`       | `WALK_CYCLE`, `RAISE_STAFF` (mannequin), `WING_FLAP` (non-humanoid), `INVALID_CLIPS`, `SMOOTH`   |
+| `@mortal-doctrine/animation/testing`       | Constraints: `MANNEQUIN_REACH` (mannequin), `OFFSET_CHAIN_RIG`, `INVALID_CONSTRAINTS`            |
 
 ## Clip data
 
@@ -92,14 +97,77 @@ draw order are discrete: from `a` when `w < 0.5`, otherwise from `b`.
 sample(clip, time) → stages in list order → evaluate(rig, pose) → orderSlots(slots, pose.drawOrder)
 ```
 
-A stage is a pure `(rig, pose) => pose`. The one stage shipped here is `blendStage`. A constraint
-stage (M1.09) goes **after blend stages and before `evaluate`**.
+A stage is a pure `(rig, pose) => pose`. The stages shipped here are `blendStage` and
+`constraintStage`. The constraint stage goes **after blend stages and before `evaluate`**.
+
+## Constraints
+
+Constraints are their own plain data, next to rig and clip data, naming rig bones by id:
+
+```ts
+{
+  schemaVersion: 1,
+  id: 'mannequin-reach',
+  constraints: [
+    // Turns `parent` and `child` so the child's tip, local (child.length, 0), is on `target`.
+    { type: 'two-bone-ik', parent: 'upper-arm-right', child: 'forearm-right',
+      target: { x: 50, y: 120 }, bend: 1, mix: 1 },
+    // Turns the bone's local +x axis toward `target`.
+    { type: 'aim', bone: 'head', target: { x: 50, y: 120 }, mix: 1 },
+    // Keeps the bone's local rotation in [min, max] degrees.
+    { type: 'limit', bone: 'head', min: -40, max: 40 },
+  ],
+}
+```
+
+`target` is a world-space point (rig space, +y up). `loadConstraints` rejects, naming the problem:
+an unknown `schemaVersion`; a missing or mistyped field; an unknown `type`; a `mix` outside
+[0, 1]; a `bend` that is not `1` or `-1`; an id that is not kebab-case; a limit with `min > max`
+or spanning a full turn or more; two limits on one bone. `constraintStage(rig, constraints)`
+throws when a constraint names a bone the rig does not have or an IK `child` that is not a direct
+child of its `parent`. The stage it returns is for that rig and ignores the `rig` argument a
+pipeline passes it.
+
+- **Order.** The stage applies every `two-bone-ik` and `aim` constraint in list order (a later
+  one sees the earlier ones' result), then every `limit`. So **no limit is exceeded after the
+  stage**, wherever it sits in the list, and a limit wins over IK: a limited chain may not reach
+  its target.
+- **What it writes.** Only the `rotation` of the bones the constraints name (starting from the
+  rest rotation when the pose did not name it). Translation, scale, attachments and draw order
+  pass through.
+- **Two-bone IK.** The first segment runs from the parent's origin to the child's origin:
+  `l1 = |child.translation|`, which need not lie on the parent's +x axis. The second is
+  `l2 = child.length`. `parent.length` is not used. A target between `|l1 - l2|` and `l1 + l2`
+  from the chain root is reached **within 1e-6 world units**. A farther target gives a straight
+  chain pointing at it; a nearer one gives a fully folded chain pointing toward it. `bend: 1`
+  puts the middle joint on the left of the line from the root to the target (counter-clockwise
+  from it), `bend: -1` on the right.
+- **Mix.** `mix: 0` leaves the incoming rotations exactly as they were; `mix: 1` writes the solved
+  rotations exactly; in between, each rotation moves along the shorter arc (`lerpAngle`), so an
+  IK effector does not travel in a straight line to the target.
+- **Limits are hard**: no mix. The result is the rotation, modulo a full turn, that lies in
+  `[min, max]`; a rotation outside the range moves to the nearer bound by angular distance.
+- **Degenerate input** never throws or yields `NaN`: zero-length segments, a target on the chain
+  root (the direction is then arbitrary but repeatable), an aim target within 1e-9 of the bone's
+  origin (the bone keeps its rotation), a zero scale above the bone (the constraint is skipped).
+- **Limitations.** IK assumes the parent and child bones have scale (1, 1) in the pose, and aim
+  a positive x scale; non-uniform or negative scale there gives wrong angles. Scale on the bones
+  above them is handled. Targets are fixed points: no bone or anchor targets, and clips cannot
+  key a mix.
 
 ## Usage
 
 ```ts
-import { blendStage, loadClip, orderSlots, runPipeline, sample } from '@mortal-doctrine/animation';
-import { RAISE_STAFF, WALK_CYCLE } from '@mortal-doctrine/animation/testing';
+import {
+  blendStage,
+  constraintStage,
+  loadClip,
+  loadConstraints,
+  orderSlots,
+  runPipeline,
+  sample,
+} from '@mortal-doctrine/animation';
+import { MANNEQUIN_REACH, RAISE_STAFF, WALK_CYCLE } from '@mortal-doctrine/animation/testing';
 import { evaluate, loadRig } from '@mortal-doctrine/rig';
 import { MANNEQUIN_RIG } from '@mortal-doctrine/rig/testing';
 
@@ -107,7 +175,9 @@ const rig = loadRig(MANNEQUIN_RIG);
 const walk = loadClip(WALK_CYCLE);
 const raise = loadClip(RAISE_STAFF);
 
-const pose = runPipeline(rig, sample(walk, 16.5), [blendStage(sample(raise, 20), 0.5)]);
+const reach = constraintStage(rig, loadConstraints(MANNEQUIN_REACH));
+
+const pose = runPipeline(rig, sample(walk, 16.5), [blendStage(sample(raise, 20), 0.5), reach]);
 const { bones, slots } = evaluate(rig, pose);
 orderSlots(slots, pose.drawOrder).map((slot) => slot.id); // ['held-right', 'body', 'face']
 ```
@@ -115,5 +185,6 @@ orderSlots(slots, pose.drawOrder).map((slot) => slot.id); // ['held-right', 'bod
 ## Integration
 
 - **Consumes** `Rig`, `Pose` and `evaluate` from `@mortal-doctrine/rig` (unchanged).
-- **Consumers today:** the Studio Animation Lab (`/labs/animation`).
-- **Later:** M1.09 adds a constraint stage; M1.10 draws `orderSlots(...)` output with Pixi.
+- **Consumers today:** the Studio Animation Lab (`/labs/animation`) and Pose Constraints Lab
+  (`/labs/pose-constraints`).
+- **Later:** M1.10 draws `orderSlots(...)` output with Pixi.

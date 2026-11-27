@@ -111,6 +111,12 @@ Character APIs do not exist yet (M2–M3). The fixed parts:
   draws both pushboxes (resizing when crouching or airborne) and each fighter's trajectory;
   readouts show the frame and each fighter's x, y, vx, vy, facing and state, plus the movement
   event log. Play/Pause, Step and Reset; live input is not supported yet.
+- The Pose Constraints Lab (`/labs/pose-constraints`) runs the mannequin's rest pose through the
+  production constraint stage (`MANNEQUIN_REACH`: two-bone IK on the right arm, an aim on the
+  head, angle limits). Drag the target or type its position; a mix slider and a bend control
+  change the constraint data. The SVG view draws the limit arcs; readouts show the target, the
+  end effector, its distance from the shoulder against full reach, and each limited bone's
+  rotation.
 - Diagnostics are measured by the host app around simulation calls; the simulation itself never
   reads clocks.
 - `pnpm bench` runs headless Vitest benchmarks (`tests/*.bench.ts`). Compare results only on the
