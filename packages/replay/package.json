@@ -1,0 +1,24 @@
+{
+  "name": "@mortal-doctrine/replay",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "mortalDoctrine": {
+    "layer": "simulation"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mortal-doctrine/sim-core": "workspace:*",
+    "@mortal-doctrine/simulation": "workspace:*",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "vitest": "^5.1.2"
+  }
+}
