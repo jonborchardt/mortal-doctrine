@@ -1,0 +1,26 @@
+{
+  "name": "@mortal-doctrine/camera",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "mortalDoctrine": {
+    "layer": "presentation"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mortal-doctrine/movement": "workspace:*",
+    "@mortal-doctrine/renderer": "workspace:*",
+    "@mortal-doctrine/sim-core": "workspace:*",
+    "@mortal-doctrine/simulation": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^5.1.2"
+  }
+}
