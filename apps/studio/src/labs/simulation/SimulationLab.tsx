@@ -165,7 +165,7 @@ export function SimulationLab() {
   useEffect(() => {
     const renderer = sessionRef.current?.loop.renderer;
     if (fixtureLayer === 'off' || !renderer) return;
-    const key = `${loopGeneration}:${fixtureLayer}:${resolution}`;
+    const key = fixtureKey;
     let cancelled = false;
     let unregister = () => {};
     createFixture(fixtureLayer, resolution).then(
@@ -186,7 +186,7 @@ export function SimulationLab() {
       cancelled = true;
       unregister();
     };
-  }, [loopGeneration, fixtureLayer, resolution]);
+  }, [fixtureKey, fixtureLayer, resolution]);
 
   // Event handlers only: refs must not be read during render.
   const control = (action: (session: Session) => void) => {
