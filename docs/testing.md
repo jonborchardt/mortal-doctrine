@@ -49,6 +49,9 @@ Every simulation-layer subsystem must show:
   and each one by name), `MOTION_CASES` with `spanned` for window boundary tables, `mirror`,
   `COMMAND_SCRIPTS` / `commandCycleScript` (inputs for both players), and the
   `startRun` / `advanceRun` recognizer harness.
+- Camera fixtures (`@mortal-doctrine/camera/testing`): `FIXTURE_CAMERA_CONFIG`, a placeholder
+  960×540 framing whose visual bounds reach 4000 sub-units beyond each wall of the default arena,
+  with `land` and `wall-contact` shakes.
 - Keep fixtures small, readable and built from public APIs. Before production characters exist,
   use geometric placeholders and reference mannequins (future: a minimal test rig in the skeleton
   package), never production content.
