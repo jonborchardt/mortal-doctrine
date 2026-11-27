@@ -1,11 +1,11 @@
 import { updateCommands, type CommandEvent, type Facing } from '@mortal-doctrine/commands';
+import { updateMovement, type MovementEvent } from '@mortal-doctrine/movement';
 import { assertInt32, parseFrameInputs, type FrameInputs } from '@mortal-doctrine/sim-core';
-import { updateFighters, type BoundaryContactEvent } from './fighters';
 import { updateInput } from './input';
 import type { SimulationState } from './state';
 
 /** Every event `step` can return. Ordered by phase, then player index, then emission. */
-export type SimulationEvent = CommandEvent | BoundaryContactEvent;
+export type SimulationEvent = CommandEvent | MovementEvent;
 
 export interface StepResult {
   readonly state: SimulationState;
@@ -13,15 +13,10 @@ export interface StepResult {
   readonly events: readonly SimulationEvent[];
 }
 
-/**
- * The facing the next `step` uses for command recognition. Placeholder until real facing
- * exists: toward the opponent by x; on equal x player 0 faces right and player 1 left.
- */
+/** The stored facing of each fighter, which the next `step` uses for command recognition. */
 export function playerFacing(state: SimulationState): readonly [Facing, Facing] {
-  const [own, other] = state.fighters;
-  if (own.x < other.x) return ['right', 'left'];
-  if (own.x > other.x) return ['left', 'right'];
-  return ['right', 'left'];
+  const [p0, p1] = state.fighters;
+  return [p0.facing === 1 ? 'right' : 'left', p1.facing === 1 ? 'right' : 'left'];
 }
 
 /**
@@ -36,17 +31,17 @@ export function step(state: SimulationState, inputs: FrameInputs): StepResult {
   // Phase order (also in docs/architecture.md). Each owner sees only a read-only context.
   // 1. Input history: append this tick's raw frames before anything else runs.
   const input = updateInput(state.input, { frame, inputs: validInputs });
-  // 2. Commands: recognize definitions from the history, facing from start-of-tick positions.
+  // 2. Commands: recognize definitions from the history with start-of-tick facing.
   const commands = updateCommands(state.commands, {
     frame,
     histories: input.slice.history,
     facing: playerFacing(state),
   });
-  // 3. Walk/bounds: placeholder movement from the resolved direction of the current frame.
-  const fighters = updateFighters(state.fighters, {
+  // 3. Movement: walk, crouch, jump, walls, separation limit, pushboxes, facing.
+  const fighters = updateMovement(state.fighters, {
     frame,
     inputs: validInputs,
-    input: input.slice,
+    arena: state.arena,
   });
   // 4. Collect events in phase order (each phase already orders by player, then emission).
   const events: readonly SimulationEvent[] = Object.freeze([
@@ -61,6 +56,7 @@ export function step(state: SimulationState, inputs: FrameInputs): StepResult {
       frame: frame + 1,
       rng: state.rng,
       input: input.slice,
+      arena: state.arena,
       fighters: fighters.slice,
       commands: commands.slice,
     },

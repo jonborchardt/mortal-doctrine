@@ -273,6 +273,9 @@ importers:
       '@mortal-doctrine/math':
         specifier: workspace:*
         version: link:../../packages/math
+      '@mortal-doctrine/movement':
+        specifier: workspace:*
+        version: link:../../packages/movement
       '@mortal-doctrine/renderer':
         specifier: workspace:*
         version: link:../../packages/renderer
@@ -371,6 +374,19 @@ importers:
         specifier: ^5.1.2
         version: 5.1.2(@types/node@24.19.4)(vite@8.3.8(@types/node@24.19.4)(jiti@2.7.0))
 
+  packages/movement:
+    dependencies:
+      '@mortal-doctrine/sim-core':
+        specifier: workspace:*
+        version: link:../sim-core
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      vitest:
+        specifier: ^5.1.2
+        version: 5.1.2(@types/node@24.19.4)(vite@8.3.8(@types/node@24.19.4)(jiti@2.7.0))
+
   packages/renderer:
     dependencies:
       '@mortal-doctrine/sim-core':
@@ -434,6 +450,9 @@ importers:
       '@mortal-doctrine/commands':
         specifier: workspace:*
         version: link:../commands
+      '@mortal-doctrine/movement':
+        specifier: workspace:*
+        version: link:../movement
       '@mortal-doctrine/sim-core':
         specifier: workspace:*
         version: link:../sim-core

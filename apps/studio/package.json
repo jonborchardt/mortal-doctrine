@@ -18,6 +18,7 @@
     "@mortal-doctrine/commands": "workspace:*",
     "@mortal-doctrine/input": "workspace:*",
     "@mortal-doctrine/math": "workspace:*",
+    "@mortal-doctrine/movement": "workspace:*",
     "@mortal-doctrine/renderer": "workspace:*",
     "@mortal-doctrine/replay": "workspace:*",
     "@mortal-doctrine/rig": "workspace:*",

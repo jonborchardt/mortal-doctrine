@@ -98,7 +98,7 @@ test('a key tapped between ticks is applied to exactly one step', async ({ page 
   await expect(state).toContainText('"x": 24400');
 });
 
-test('shows seed, RNG state, raw input history and boundary-contact events; Reset clears them', async ({
+test('shows seed, RNG state, raw input history and wall-contact events; Reset clears them', async ({
   page,
 }) => {
   await page.goto(SIMULATION_LAB);
@@ -125,7 +125,7 @@ test('shows seed, RNG state, raw input history and boundary-contact events; Rese
   await expect(frame).toHaveText('53');
   await expect(history).toContainText('←');
   await expect(events).toHaveCount(1);
-  await expect(events.first()).toHaveText('frame 52: boundary-contact P1 left');
+  await expect(events.first()).toHaveText('frame 52: wall-contact P1 left');
 
   // Holding several keys while single-stepping records the raw frame, opposing directions kept.
   await page.keyboard.down('KeyD');

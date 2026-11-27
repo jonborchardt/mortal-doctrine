@@ -8,11 +8,10 @@ import {
   mirror,
   QUARTER_CIRCLE,
 } from '@mortal-doctrine/commands/testing';
+import { DEFAULT_ARENA_RULES, DEFAULT_MOVEMENT_PARAMETERS } from '@mortal-doctrine/movement';
 import { InputBit, TICK_MS, type FrameInputs } from '@mortal-doctrine/sim-core';
 import { describe, expect, it } from 'vitest';
-import { updateFighters } from '../src/fighters';
 import {
-  ARENA_WIDTH,
   createInitialState,
   createSimulationRunner,
   DEFAULT_HISTORY_CAPACITY,
@@ -21,7 +20,6 @@ import {
   serializeState,
   simulationStateSchema,
   step,
-  WALK_SPEED,
   type InitialStateOptions,
   type SimulationEvent,
   type SimulationState,
@@ -38,6 +36,8 @@ import {
 } from '../src/testing';
 
 const { LEFT, RIGHT, UP, DOWN, A1, A6 } = InputBit;
+const ARENA_WIDTH = DEFAULT_ARENA_RULES.width;
+const WALK_SPEED = DEFAULT_MOVEMENT_PARAMETERS.walkForwardSpeed;
 const constant = (inputs: FrameInputs) => () => inputs;
 
 /** Replaces the value at `path` in a JSON copy of `state`. */
@@ -70,22 +70,28 @@ describe('simulation', () => {
   });
 
   it('uses sub-units: same on-screen positions and speed as before', () => {
-    expect(createInitialState().fighters).toEqual([{ x: 24_000 }, { x: 72_000 }]);
+    expect(createInitialState().fighters.map((fighter) => fighter.x)).toEqual([24_000, 72_000]);
     expect([ARENA_WIDTH, FIGHTER_WIDTH, WALK_SPEED]).toEqual([96_000, 6_000, 400]);
+    expect(DEFAULT_MOVEMENT_PARAMETERS.walkBackSpeed).toBe(400);
   });
 
   it('keeps fighters inside the arena', () => {
     const left = runFrames(createInitialState(), constant(P1_LEFT), 1000).state;
     const right = runFrames(createInitialState(), constant(P1_RIGHT), 1000).state;
     expect(left.fighters[0].x).toBe(FIGHTER_WIDTH / 2);
-    expect(right.fighters[0].x).toBe(ARENA_WIDTH - FIGHTER_WIDTH / 2);
+    // Walking right, player one pushes player two into the right corner and stops against it.
+    expect(right.fighters[1].x).toBe(ARENA_WIDTH - FIGHTER_WIDTH / 2);
+    expect(right.fighters[0].x).toBe(ARENA_WIDTH - FIGHTER_WIDTH - FIGHTER_WIDTH / 2);
   });
 
-  it('walks by the resolved direction: left + right does not move, buttons are ignored', () => {
+  it('moves by the resolved direction: left + right does not move, buttons are ignored, up + down jumps', () => {
     const start = createInitialState();
-    const { state } = step(start, [held(LEFT, RIGHT), held(RIGHT, UP, DOWN, A1, A6)]);
+    const { state } = step(start, [held(LEFT, RIGHT), held(RIGHT, A1, A6)]);
     expect(state.fighters[0].x).toBe(start.fighters[0].x);
     expect(state.fighters[1].x).toBe(start.fighters[1].x + WALK_SPEED);
+    // Up + down resolves to up: player two (facing left) back-jumps instead of crouching.
+    const jumped = step(start, [0, held(RIGHT, UP, DOWN, A1)]).state.fighters[1];
+    expect(jumped).toMatchObject({ x: 72_500, y: 1950, grounded: false, crouching: false });
   });
 });
 
@@ -165,20 +171,10 @@ describe('input history', () => {
     }
   });
 
-  it('already contains the current frame when the walk phase runs', () => {
-    // Walk reads the current frame from history: moving on the very first tick proves the
-    // history phase ran first.
-    expect(step(createInitialState(), P1_RIGHT).state.fighters[0].x).toBe(24_400);
-    const fighters = createInitialState().fighters;
-    const moved = updateFighters(fighters, {
-      frame: 0,
-      inputs: IDLE,
-      input: { capacity: 60, history: [[RIGHT], [LEFT]] },
-    });
-    expect(moved.slice).toEqual([{ x: 24_400 }, { x: 71_600 }]);
-    expect(() =>
-      updateFighters(fighters, { frame: 0, inputs: IDLE, input: createInitialState().input }),
-    ).toThrow(/before input history/);
+  it('already contains the current frame after the first tick, which also moves', () => {
+    const { state } = step(createInitialState(), P1_RIGHT);
+    expect(state.input.history[0]).toEqual([RIGHT]);
+    expect(state.fighters[0].x).toBe(24_400);
   });
 
   it('round-trips exactly through serialization', () => {
@@ -201,7 +197,7 @@ describe('rng slice', () => {
 });
 
 describe('events', () => {
-  it('returns both same-tick boundary contacts in player order, stamped with the processed frame', () => {
+  it('returns both same-tick wall contacts in player order, stamped with the processed frame', () => {
     let state = createInitialState();
     const seen: SimulationEvent[] = [];
     for (let i = 0; i < 60; i++) {
@@ -210,8 +206,8 @@ describe('events', () => {
       state = result.state;
     }
     expect(seen).toEqual([
-      { type: 'boundary-contact', frame: 52, player: 0, side: 'left' },
-      { type: 'boundary-contact', frame: 52, player: 1, side: 'right' },
+      { type: 'wall-contact', frame: 52, player: 0, side: 'left' },
+      { type: 'wall-contact', frame: 52, player: 1, side: 'right' },
     ]);
   });
 
@@ -219,10 +215,12 @@ describe('events', () => {
     const { events } = runFrames(createInitialState(), walkCycleScript, 3600);
     expect(events.length).toBe(40); // player two reaches the right edge once per 90-frame cycle
     expect(
-      events.every((e) => e.type === 'boundary-contact' && e.player === 1 && e.side === 'right'),
+      events.every((e) => e.type === 'wall-contact' && e.player === 1 && e.side === 'right'),
     ).toBe(true);
     expect(events[0]?.frame).toBe(52);
-    expect(events[1]?.frame).toBe(90 + 19);
+    // Reversing from walking left (vx -400) to right first adds the acceleration (vx 0) and
+    // only then reaches +400, so the second contact is one tick later than 20 ticks of walking.
+    expect(events[1]?.frame).toBe(90 + 20);
   });
 
   it('returns a new frozen array every step that consumers cannot use to affect the simulation', () => {
@@ -356,8 +354,8 @@ describe('simulation runner', () => {
     expect(batches.map((b) => b.ticks)).toEqual([15, 15, 15, 15]);
     expect(batches.slice(0, 3).every((b) => b.events.length === 0)).toBe(true);
     expect(batches[3]?.events).toEqual([
-      { type: 'boundary-contact', frame: 52, player: 0, side: 'left' },
-      { type: 'boundary-contact', frame: 57, player: 1, side: 'right' },
+      { type: 'wall-contact', frame: 52, player: 0, side: 'left' },
+      { type: 'wall-contact', frame: 57, player: 1, side: 'right' },
     ]);
   });
 
@@ -365,7 +363,7 @@ describe('simulation runner', () => {
     const runner = createSimulationRunner();
     for (let i = 0; i < 52; i++) expect(runner.stepOnce(constant(P1_LEFT))).toEqual([]);
     expect(runner.stepOnce(constant(P1_LEFT))).toEqual([
-      { type: 'boundary-contact', frame: 52, player: 0, side: 'left' },
+      { type: 'wall-contact', frame: 52, player: 0, side: 'left' },
     ]);
   });
 
@@ -478,7 +476,7 @@ describe('commands', () => {
     }
   });
 
-  it('orders same-tick commands by player, then definition order, before boundary contact', () => {
+  it('orders same-tick commands by player, then definition order, before wall contact', () => {
     const first: CommandDefinition = { ...CHORD, id: 'z-first' };
     const second: CommandDefinition = {
       ...CHORD,
@@ -493,7 +491,7 @@ describe('commands', () => {
       { type: 'command', frame: 52, player: 0, command: 'a-second' },
       { type: 'command', frame: 52, player: 1, command: 'z-first' },
       { type: 'command', frame: 52, player: 1, command: 'a-second' },
-      { type: 'boundary-contact', frame: 52, player: 0, side: 'left' },
+      { type: 'wall-contact', frame: 52, player: 0, side: 'left' },
     ]);
   });
 
@@ -516,16 +514,23 @@ describe('commands', () => {
     expect(commandEvents(p1.events)[0]?.player).toBe(1);
   });
 
-  it('derives facing from start-of-tick x, with the equal-x tie-break', () => {
+  it('uses the stored start-of-tick facing, which grounded fighters turn toward the opponent', () => {
     // Both players enter the unmirrored quarter-circle: only one facing right recognizes it.
+    // The first tick turns grounded fighters toward each other by x; on equal x (where the
+    // pushboxes overlap and player 0 is pushed left) the stored facing is kept.
     const quarter: FrameInputs[] = [DOWN, held(DOWN, RIGHT), held(RIGHT, A1)].map((frame) => [
       frame,
       frame,
     ]);
     const recognizers = (x0: number, x1: number) => {
+      const initial = createInitialState(COMMAND_OPTIONS);
+      const [f0, f1] = initial.fighters;
       const start: SimulationState = {
-        ...createInitialState(COMMAND_OPTIONS),
-        fighters: [{ x: x0 }, { x: x1 }],
+        ...initial,
+        fighters: [
+          { ...f0, x: x0 },
+          { ...f1, x: x1 },
+        ],
       };
       return commandEvents(runFrames(start, scripted(quarter), 3).events).map((e) => e.player);
     };

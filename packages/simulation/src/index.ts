@@ -1,5 +1,5 @@
-export { ARENA_WIDTH, FIGHTER_WIDTH, WALK_SPEED } from './constants';
-export type { BoundaryContactEvent, FighterState } from './fighters';
+export { FIGHTER_WIDTH } from './constants';
+export type { FighterState } from '@mortal-doctrine/movement';
 export { DEFAULT_HISTORY_CAPACITY, MAX_HISTORY_CAPACITY } from './input';
 export {
   createInitialState,
