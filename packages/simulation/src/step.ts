@@ -1,15 +1,27 @@
+import { updateCommands, type CommandEvent, type Facing } from '@mortal-doctrine/commands';
 import { assertInt32, parseFrameInputs, type FrameInputs } from '@mortal-doctrine/sim-core';
 import { updateFighters, type BoundaryContactEvent } from './fighters';
 import { updateInput } from './input';
 import type { SimulationState } from './state';
 
 /** Every event `step` can return. Ordered by phase, then player index, then emission. */
-export type SimulationEvent = BoundaryContactEvent;
+export type SimulationEvent = CommandEvent | BoundaryContactEvent;
 
 export interface StepResult {
   readonly state: SimulationState;
   /** A new frozen array every step. */
   readonly events: readonly SimulationEvent[];
+}
+
+/**
+ * The facing the next `step` uses for command recognition. Placeholder until real facing
+ * exists: toward the opponent by x; on equal x player 0 faces right and player 1 left.
+ */
+export function playerFacing(state: SimulationState): readonly [Facing, Facing] {
+  const [own, other] = state.fighters;
+  if (own.x < other.x) return ['right', 'left'];
+  if (own.x > other.x) return ['left', 'right'];
+  return ['right', 'left'];
 }
 
 /**
@@ -24,18 +36,34 @@ export function step(state: SimulationState, inputs: FrameInputs): StepResult {
   // Phase order (also in docs/architecture.md). Each owner sees only a read-only context.
   // 1. Input history: append this tick's raw frames before anything else runs.
   const input = updateInput(state.input, { frame, inputs: validInputs });
-  // 2. Walk/bounds: placeholder movement from the resolved direction of the current frame.
+  // 2. Commands: recognize definitions from the history, facing from start-of-tick positions.
+  const commands = updateCommands(state.commands, {
+    frame,
+    histories: input.slice.history,
+    facing: playerFacing(state),
+  });
+  // 3. Walk/bounds: placeholder movement from the resolved direction of the current frame.
   const fighters = updateFighters(state.fighters, {
     frame,
     inputs: validInputs,
     input: input.slice,
   });
-  // 3. Collect events in phase order (each phase already orders by player, then emission).
-  const events: readonly SimulationEvent[] = Object.freeze([...input.events, ...fighters.events]);
+  // 4. Collect events in phase order (each phase already orders by player, then emission).
+  const events: readonly SimulationEvent[] = Object.freeze([
+    ...input.events,
+    ...commands.events,
+    ...fighters.events,
+  ]);
 
   // The rng slice passes through: no gameplay draws yet (see rng.ts).
   return {
-    state: { frame: frame + 1, rng: state.rng, input: input.slice, fighters: fighters.slice },
+    state: {
+      frame: frame + 1,
+      rng: state.rng,
+      input: input.slice,
+      fighters: fighters.slice,
+      commands: commands.slice,
+    },
     events,
   };
 }

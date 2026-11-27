@@ -10,7 +10,7 @@ export {
   type InitialStateOptions,
   type SimulationState,
 } from './state';
-export { step, type SimulationEvent, type StepResult } from './step';
+export { playerFacing, step, type SimulationEvent, type StepResult } from './step';
 export {
   createSimulationRunner,
   type AdvanceResult,

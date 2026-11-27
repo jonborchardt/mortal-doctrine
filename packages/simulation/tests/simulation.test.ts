@@ -1,3 +1,13 @@
+import type { CommandDefinition } from '@mortal-doctrine/commands';
+import {
+  CHARGE,
+  CHORD,
+  COMMAND_SCRIPTS,
+  commandCycleScript,
+  GENERIC_COMMANDS,
+  mirror,
+  QUARTER_CIRCLE,
+} from '@mortal-doctrine/commands/testing';
 import { InputBit, TICK_MS, type FrameInputs } from '@mortal-doctrine/sim-core';
 import { describe, expect, it } from 'vitest';
 import { updateFighters } from '../src/fighters';
@@ -12,6 +22,7 @@ import {
   simulationStateSchema,
   step,
   WALK_SPEED,
+  type InitialStateOptions,
   type SimulationEvent,
   type SimulationState,
 } from '../src/index';
@@ -207,7 +218,9 @@ describe('events', () => {
   it('emits once per contact, not while a fighter stays at the edge', () => {
     const { events } = runFrames(createInitialState(), walkCycleScript, 3600);
     expect(events.length).toBe(40); // player two reaches the right edge once per 90-frame cycle
-    expect(events.every((e) => e.player === 1 && e.side === 'right')).toBe(true);
+    expect(
+      events.every((e) => e.type === 'boundary-contact' && e.player === 1 && e.side === 'right'),
+    ).toBe(true);
     expect(events[0]?.frame).toBe(52);
     expect(events[1]?.frame).toBe(90 + 19);
   });
@@ -376,5 +389,157 @@ describe('simulation runner', () => {
     expect(runner.state.input.capacity).toBe(8);
     runner.resume();
     expect(runner.advance(TICK_MS, constant(IDLE)).ticks).toBe(1);
+  });
+});
+
+describe('commands', () => {
+  const COMMAND_OPTIONS: InitialStateOptions = { seed: 7, commands: GENERIC_COMMANDS };
+  const commandEvents = (events: readonly SimulationEvent[]) =>
+    events.filter((event) => event.type === 'command');
+  const scripted = (inputs: readonly FrameInputs[]) => (frame: number) => inputs[frame] ?? IDLE;
+  const A2 = InputBit.A2;
+  const A5 = InputBit.A5;
+
+  function deepFreeze<T>(value: T): T {
+    if (typeof value === 'object' && value !== null) {
+      Object.values(value).forEach(deepFreeze);
+      Object.freeze(value);
+    }
+    return value;
+  }
+
+  it('has no definitions and emits no command event without the option', () => {
+    expect(createInitialState().commands).toEqual({ definitions: [], charges: [[], []] });
+    const { events } = runFrames(createInitialState(), commandCycleScript, 600);
+    expect(commandEvents(events)).toEqual([]);
+  });
+
+  it('validates definitions and their history needs when creating state', () => {
+    expect(() => createInitialState({ commands: [QUARTER_CIRCLE, QUARTER_CIRCLE] })).toThrow(
+      'commands.1.id',
+    );
+    expect(() => createInitialState({ historyCapacity: 11, commands: [QUARTER_CIRCLE] })).toThrow(
+      /needs 12 history frames, more than historyCapacity 11/,
+    );
+    const state = createInitialState({ historyCapacity: 12, commands: [QUARTER_CIRCLE] });
+    expect(() => deserializeState(serialized(withValue(state, ['input', 'capacity'], 11)))).toThrow(
+      'state.commands.definitions.0: needs 12 history frames',
+    );
+  });
+
+  it('recognizes every command script for both players with default facing', () => {
+    for (const script of COMMAND_SCRIPTS) {
+      const { events } = runFrames(
+        createInitialState(COMMAND_OPTIONS),
+        scripted(script.inputs),
+        script.inputs.length,
+      );
+      const recognized = commandEvents(events);
+      expect(recognized.map((e) => [e.player, e.command])).toEqual([
+        [0, script.id],
+        [1, script.id],
+      ]);
+      expect(recognized[0]?.frame).toBe(recognized[1]?.frame);
+    }
+  });
+
+  it('orders same-tick commands by player, then definition order, before boundary contact', () => {
+    const first: CommandDefinition = { ...CHORD, id: 'z-first' };
+    const second: CommandDefinition = {
+      ...CHORD,
+      id: 'a-second',
+      trigger: { ...CHORD.trigger, buttons: ['A1'] },
+    };
+    // Player 0 walks left and reaches the edge on frame 52; both players press A1 + A2 then.
+    const before = runFrames(createInitialState({ commands: [first, second] }), () => P1_LEFT, 52);
+    const { events } = step(before.state, [held(LEFT, A1, A2), held(A1, A2)]);
+    expect(events).toEqual([
+      { type: 'command', frame: 52, player: 0, command: 'z-first' },
+      { type: 'command', frame: 52, player: 0, command: 'a-second' },
+      { type: 'command', frame: 52, player: 1, command: 'z-first' },
+      { type: 'command', frame: 52, player: 1, command: 'a-second' },
+      { type: 'boundary-contact', frame: 52, player: 0, side: 'left' },
+    ]);
+  });
+
+  it('gives player 1 (facing left) the same commands for the mirrored input', () => {
+    const quarter = [0, DOWN, held(DOWN, RIGHT), held(RIGHT, A1)];
+    const p0 = runFrames(
+      createInitialState(COMMAND_OPTIONS),
+      scripted(quarter.map((frame) => [frame, 0])),
+      4,
+    );
+    const p1 = runFrames(
+      createInitialState(COMMAND_OPTIONS),
+      scripted(quarter.map((frame) => [0, mirror(frame)])),
+      4,
+    );
+    const ids = (events: readonly SimulationEvent[]) =>
+      commandEvents(events).map((e) => [e.command, e.frame]);
+    expect(ids(p0.events)).toEqual([['quarter-circle', 3]]);
+    expect(ids(p1.events)).toEqual(ids(p0.events));
+    expect(commandEvents(p1.events)[0]?.player).toBe(1);
+  });
+
+  it('derives facing from start-of-tick x, with the equal-x tie-break', () => {
+    // Both players enter the unmirrored quarter-circle: only one facing right recognizes it.
+    const quarter: FrameInputs[] = [DOWN, held(DOWN, RIGHT), held(RIGHT, A1)].map((frame) => [
+      frame,
+      frame,
+    ]);
+    const recognizers = (x0: number, x1: number) => {
+      const start: SimulationState = {
+        ...createInitialState(COMMAND_OPTIONS),
+        fighters: [{ x: x0 }, { x: x1 }],
+      };
+      return commandEvents(runFrames(start, scripted(quarter), 3).events).map((e) => e.player);
+    };
+    expect(recognizers(50_000, 50_000)).toEqual([0]);
+    expect(recognizers(20_000, 80_000)).toEqual([0]);
+    expect(recognizers(80_000, 20_000)).toEqual([1]);
+  });
+
+  it('recognizes a charge longer than the history and survives restore mid-charge', () => {
+    const options: InitialStateOptions = { historyCapacity: 12, commands: [CHARGE] };
+    const charge: FrameInputs[] = [
+      ...Array.from({ length: 30 }, (): FrameInputs => [LEFT, RIGHT]),
+      [held(RIGHT, A5), held(LEFT, A5)],
+    ];
+    const whole = runFrames(createInitialState(options), scripted(charge), 40);
+    expect(commandEvents(whole.events).map((e) => [e.player, e.frame])).toEqual([
+      [0, 30],
+      [1, 30],
+    ]);
+    const first = runFrames(createInitialState(options), scripted(charge), 20);
+    const restored = deserializeState(serializeState(first.state));
+    expect(restored).toEqual(first.state);
+    const rest = runFrames(restored, scripted(charge), 20);
+    expect([...first.events, ...rest.events]).toEqual(whole.events);
+    expect(serializeState(rest.state)).toBe(serializeState(whole.state));
+  });
+
+  it('is deterministic, restore-equivalent and pure over 600 scripted frames', () => {
+    const a = runFrames(createInitialState(COMMAND_OPTIONS), commandCycleScript, 600);
+    const b = runFrames(createInitialState(COMMAND_OPTIONS), commandCycleScript, 600);
+    expect(commandEvents(a.events).length).toBeGreaterThan(20);
+    expect(serializeState(a.state)).toBe(serializeState(b.state));
+    expect(JSON.stringify(a.events)).toBe(JSON.stringify(b.events));
+
+    const firstHalf = runFrames(createInitialState(COMMAND_OPTIONS), commandCycleScript, 337);
+    const restored = deserializeState(serializeState(firstHalf.state));
+    const secondHalf = runFrames(restored, commandCycleScript, 600 - 337);
+    expect([...firstHalf.events, ...secondHalf.events]).toEqual(a.events);
+    expect(serializeState(secondHalf.state)).toBe(serializeState(a.state));
+
+    const frozen = deepFreeze(firstHalf.state);
+    const snapshot = serializeState(frozen);
+    expect(serializeState(runFrames(frozen, commandCycleScript, 263).state)).toBe(
+      serializeState(a.state),
+    );
+    expect(serializeState(frozen)).toBe(snapshot);
+
+    for (const n of numbersIn(a.state)) {
+      expect(Number.isInteger(n) && n >= -2_147_483_648 && n <= 2_147_483_647).toBe(true);
+    }
   });
 });

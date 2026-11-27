@@ -38,6 +38,10 @@ Every simulation-layer subsystem must show:
   `P1_LEFT`, `SEEDED_OPTIONS` (non-default seed and history capacity), `walkCycleScript` (an
   `InputProvider` mapping absolute frame → `FrameInputs`) and
   `runFrames(state, script, count) → { state, events }`.
+- Command fixtures (`@mortal-doctrine/commands/testing`): generic definitions (`GENERIC_COMMANDS`
+  and each one by name), `MOTION_CASES` with `spanned` for window boundary tables, `mirror`,
+  `COMMAND_SCRIPTS` / `commandCycleScript` (inputs for both players), and the
+  `startRun` / `advanceRun` recognizer harness.
 - Keep fixtures small, readable and built from public APIs. Before production characters exist,
   use geometric placeholders and reference mannequins (future: a minimal test rig in the skeleton
   package), never production content.
