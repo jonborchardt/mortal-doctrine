@@ -227,6 +227,9 @@ importers:
       '@mortal-doctrine/renderer':
         specifier: workspace:*
         version: link:../../packages/renderer
+      '@mortal-doctrine/sim-core':
+        specifier: workspace:*
+        version: link:../../packages/sim-core
       '@mortal-doctrine/simulation':
         specifier: workspace:*
         version: link:../../packages/simulation
@@ -264,6 +267,9 @@ importers:
       '@mortal-doctrine/renderer':
         specifier: workspace:*
         version: link:../../packages/renderer
+      '@mortal-doctrine/sim-core':
+        specifier: workspace:*
+        version: link:../../packages/sim-core
       '@mortal-doctrine/simulation':
         specifier: workspace:*
         version: link:../../packages/simulation
@@ -298,9 +304,9 @@ importers:
 
   packages/input:
     dependencies:
-      '@mortal-doctrine/simulation':
+      '@mortal-doctrine/sim-core':
         specifier: workspace:*
-        version: link:../simulation
+        version: link:../sim-core
     devDependencies:
       vitest:
         specifier: ^5.1.2
@@ -308,6 +314,9 @@ importers:
 
   packages/renderer:
     dependencies:
+      '@mortal-doctrine/sim-core':
+        specifier: workspace:*
+        version: link:../sim-core
       '@mortal-doctrine/simulation':
         specifier: workspace:*
         version: link:../simulation
@@ -315,8 +324,21 @@ importers:
         specifier: ^8.23.0
         version: 8.23.0
 
+  packages/sim-core:
+    dependencies:
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      vitest:
+        specifier: ^5.1.2
+        version: 5.1.2(@types/node@24.19.4)(vite@8.3.8(@types/node@24.19.4)(jiti@2.7.0))
+
   packages/simulation:
     dependencies:
+      '@mortal-doctrine/sim-core':
+        specifier: workspace:*
+        version: link:../sim-core
       zod:
         specifier: ^4.6.7
         version: 4.6.7

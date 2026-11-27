@@ -15,6 +15,7 @@
   "dependencies": {
     "@mortal-doctrine/input": "workspace:*",
     "@mortal-doctrine/renderer": "workspace:*",
+    "@mortal-doctrine/sim-core": "workspace:*",
     "@mortal-doctrine/simulation": "workspace:*",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"

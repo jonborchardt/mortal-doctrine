@@ -3,6 +3,7 @@ import prettier from 'eslint-config-prettier';
 import { defineConfig, globalIgnores } from 'eslint/config';
 import reactHooks from 'eslint-plugin-react-hooks';
 import tseslint from 'typescript-eslint';
+import { determinismLintConfig, loadWorkspace } from './scripts/check-boundaries.ts';
 
 // Packages expose only declared entry points (root, plus `/testing` for fixtures).
 const noDeepImports = {
@@ -47,31 +48,10 @@ export default defineConfig(
       'no-restricted-imports': ['error', { patterns: [noDeepImports, noReact] }],
     },
   },
-  {
-    // Determinism guard. The simulation tsconfig already excludes DOM and Node types;
-    // these catch nondeterministic sources that exist in plain ECMAScript.
-    files: ['packages/simulation/**'],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            noDeepImports,
-            noReact,
-            { group: ['pixi.js', 'node:*'], message: 'Simulation must stay pure and headless.' },
-          ],
-        },
-      ],
-      'no-restricted-globals': [
-        'error',
-        { name: 'Date', message: 'Simulation must not read the system clock.' },
-      ],
-      'no-restricted-properties': [
-        'error',
-        { object: 'Math', property: 'random', message: 'Use a seeded RNG carried in state.' },
-      ],
-    },
-  },
+  // Determinism guard for every package whose declared layer is foundation, simulation or
+  // animation (derived from package.json, so new packages need no edit here). Their tsconfig
+  // checks (no DOM lib, no ambient types) live in the boundary checker.
+  determinismLintConfig(loadWorkspace(import.meta.dirname), [noDeepImports]),
   {
     files: ['apps/**/*.{ts,tsx}'],
     extends: [reactHooks.configs.flat['recommended-latest']],

@@ -23,6 +23,9 @@ export const LOCATIONS: Record<string, { prefix: string; layers: readonly Layer[
   apps: { prefix: '', layers: ['application'] },
 };
 
+/** Layers whose packages must stay deterministic and headless. */
+export const DETERMINISTIC_LAYERS: readonly Layer[] = ['foundation', 'simulation', 'animation'];
+
 const SCOPE = '@mortal-doctrine/';
 
 export interface Manifest {
@@ -39,8 +42,52 @@ export interface WorkspacePackage {
   dir: string;
   manifest: Manifest;
   hasReadme: boolean;
+  /** The package's own `tsconfig.json` (comments allowed), `undefined` if it has none. */
+  tsconfig: { compilerOptions?: { lib?: unknown; types?: unknown } } | undefined;
   /** Bare import specifiers found in source files, with the file they appear in. */
   imports: readonly { specifier: string; file: string }[];
+}
+
+export function isDeterministic(pkg: Pick<WorkspacePackage, 'manifest'>): boolean {
+  return (DETERMINISTIC_LAYERS as readonly string[]).includes(
+    pkg.manifest.mortalDoctrine?.layer ?? '',
+  );
+}
+
+/**
+ * The ESLint determinism block, covering every package whose declared layer is deterministic.
+ * `importPatterns` are the restricted-import patterns that already apply to those files (an
+ * ESLint rule setting replaces, rather than merges with, earlier settings).
+ */
+export function determinismLintConfig(
+  packages: readonly Pick<WorkspacePackage, 'dir' | 'manifest'>[],
+  importPatterns: readonly object[],
+): { name: string; files: string[]; rules: Record<string, ['error', ...unknown[]]> } {
+  const message = 'Deterministic layers must stay pure and headless.';
+  return {
+    name: 'mortal-doctrine/determinism',
+    files: packages.filter(isDeterministic).map((pkg) => `${pkg.dir}/**`),
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            ...importPatterns,
+            { group: ['pixi.js', 'pixi.js/*', 'react*', 'node:*'], message },
+          ],
+        },
+      ],
+      'no-restricted-globals': [
+        'error',
+        { name: 'Date', message: 'Simulation must not read the system clock.' },
+        { name: 'performance', message: 'Simulation must not read the system clock.' },
+      ],
+      'no-restricted-properties': [
+        'error',
+        { object: 'Math', property: 'random', message: 'Use a seeded RNG carried in state.' },
+      ],
+    },
+  };
 }
 
 export function checkWorkspace(packages: readonly WorkspacePackage[]): string[] {
@@ -68,6 +115,17 @@ export function checkWorkspace(packages: readonly WorkspacePackage[]): string[] 
     if (layer !== 'application') {
       if (!pkg.manifest.exports) fail('must declare "exports" (its public entry points)');
       if (!pkg.hasReadme) fail('must have a README.md');
+    }
+    if (isDeterministic(pkg)) {
+      const options = pkg.tsconfig?.compilerOptions;
+      const libs = Array.isArray(options?.lib) ? (options.lib as unknown[]) : [];
+      if (!pkg.tsconfig) fail(`layer "${layer}" must have a tsconfig.json`);
+      if (libs.some((lib) => String(lib).toLowerCase().startsWith('dom'))) {
+        fail(`layer "${layer}" must not include a DOM lib in tsconfig.json`);
+      }
+      if (Array.isArray(options?.types) && options.types.length > 0) {
+        fail(`layer "${layer}" must not declare ambient "types" in tsconfig.json`);
+      }
     }
 
     const declared = {
@@ -152,6 +210,22 @@ export function bareImports(source: string): string[] {
     );
 }
 
+/** JSON with comments and trailing commas, as tsconfig files allow. */
+export function parseJsonc(text: string): unknown {
+  // Strings are matched first so `//` or `,]` inside a string value are left alone.
+  const STRING = /"(?:\\.|[^"\\])*"/.source;
+  const withoutComments = text.replace(
+    new RegExp(`(${STRING})|//[^\\n]*|/\\*[\\s\\S]*?\\*/`, 'g'),
+    (_, string?: string) => string ?? '',
+  );
+  return JSON.parse(
+    withoutComments.replace(
+      new RegExp(`(${STRING})|,(\\s*[}\\]])`, 'g'),
+      (_, string?: string, close?: string) => string ?? close ?? '',
+    ),
+  );
+}
+
 const SOURCE_FILE = /\.(ts|tsx|mts|js|mjs)$/;
 
 function sourceFiles(dir: string): string[] {
@@ -178,8 +252,12 @@ export function loadWorkspace(root: string): WorkspacePackage[] {
             .filter((f) => SOURCE_FILE.test(f))
             .map((f) => join(dir, f)),
         ];
+        const tsconfigPath = join(dir, 'tsconfig.json');
         return {
           dir: `${location}/${folder}`,
+          tsconfig: existsSync(tsconfigPath)
+            ? (parseJsonc(readFileSync(tsconfigPath, 'utf8')) as WorkspacePackage['tsconfig'])
+            : undefined,
           manifest: JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as Manifest,
           hasReadme: existsSync(join(dir, 'README.md')),
           imports: files.flatMap((file) =>

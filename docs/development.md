@@ -41,8 +41,9 @@ packages/<name>/
 ```
 
 Then `pnpm install`, and run `pnpm check`. Root configs pick up the new package automatically
-(Vitest, ESLint, typecheck, boundaries) — no root edits needed, except an ESLint determinism block
-for simulation-layer packages (see [architecture.md](architecture.md#layers--implemented-enforced)).
+(Vitest, ESLint, typecheck, boundaries) — no root edits needed. Determinism lint and the DOM-free
+`tsconfig` check apply from the declared layer (`foundation`, `simulation`, `animation`); see
+[architecture.md](architecture.md#layers--implemented-enforced).
 
 ## Adding a Studio lab
 
@@ -93,7 +94,9 @@ Character APIs do not exist yet (M2–M3). The fixed parts:
 
 - The Simulation Lab shows target and measured tick rate, render FPS, simulation update time per
   display frame and frame CPU time (`renderer.frameCpuMs`: callbacks + scene update + draw
-  submission; GPU time excluded). The game shows frame number and FPS.
+  submission; GPU time excluded). It also shows the seed, the RNG state, recent raw input
+  history per player (direction and button glyphs) and an event log with frame numbers. The game
+  shows frame number, FPS and player one's x in world units.
 - Diagnostics are measured by the host app around simulation calls; the simulation itself never
   reads clocks.
 - `pnpm bench` runs headless Vitest benchmarks (`tests/*.bench.ts`). Compare results only on the

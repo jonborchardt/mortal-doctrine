@@ -1,19 +1,30 @@
-import type { PlayerInput } from '@mortal-doctrine/simulation';
+import { InputBit, type InputBitName, type InputFrame } from '@mortal-doctrine/sim-core';
 
-/** Physical key codes (`KeyboardEvent.code`), so bindings survive keyboard layout changes. */
-export interface KeyBindings {
-  readonly left: readonly string[];
-  readonly right: readonly string[];
-}
+/**
+ * Physical key codes (`KeyboardEvent.code`) per `InputFrame` bit, so bindings survive keyboard
+ * layout changes.
+ */
+export type KeyBindings = Readonly<Record<InputBitName, readonly string[]>>;
 
 export const DEFAULT_BINDINGS: KeyBindings = {
-  left: ['ArrowLeft', 'KeyA'],
-  right: ['ArrowRight', 'KeyD'],
+  LEFT: ['ArrowLeft', 'KeyA'],
+  RIGHT: ['ArrowRight', 'KeyD'],
+  UP: ['ArrowUp', 'KeyW'],
+  DOWN: ['ArrowDown', 'KeyS'],
+  A1: ['KeyU'],
+  A2: ['KeyI'],
+  A3: ['KeyO'],
+  A4: ['KeyJ'],
+  A5: ['KeyK'],
+  A6: ['KeyL'],
 };
 
 export interface KeyboardInput {
-  /** Samples currently held keys as simulation input. Call once per simulation advance. */
-  read(): PlayerInput;
+  /**
+   * Samples currently held keys as a raw `InputFrame` (opposing directions are kept; the
+   * simulation resolves them). Call once per simulation tick.
+   */
+  read(): InputFrame;
   dispose(): void;
 }
 
@@ -31,10 +42,15 @@ export function createKeyboardInput(
   target.addEventListener('keyup', onKeyUp);
   target.addEventListener('blur', onBlur);
 
-  const isHeld = (codes: readonly string[]) => codes.some((code) => held.has(code));
+  const entries = Object.entries(InputBit) as [InputBitName, number][];
 
   return {
-    read: () => ({ left: isHeld(bindings.left), right: isHeld(bindings.right) }),
+    read: () =>
+      entries.reduce(
+        (frame, [name, bit]) =>
+          bindings[name].some((code) => held.has(code)) ? frame | bit : frame,
+        0,
+      ),
     dispose() {
       target.removeEventListener('keydown', onKeyDown);
       target.removeEventListener('keyup', onKeyUp);

@@ -1,8 +1,7 @@
-/** Authoritative simulation rate. All gameplay timing is expressed in ticks of this rate. */
-export const TICK_RATE = 60;
-export const TICK_MS = 1000 / TICK_RATE;
+import { SUBUNITS_PER_UNIT } from '@mortal-doctrine/sim-core';
 
-// World units are integers so that stepping is exact and platform-independent.
-export const ARENA_WIDTH = 960;
-export const FIGHTER_WIDTH = 60;
-export const WALK_SPEED = 4;
+// Integer sub-units (see sim-core's numeric convention) so stepping is exact everywhere.
+export const ARENA_WIDTH = 960 * SUBUNITS_PER_UNIT;
+export const FIGHTER_WIDTH = 60 * SUBUNITS_PER_UNIT;
+/** Sub-units per frame. */
+export const WALK_SPEED = 4 * SUBUNITS_PER_UNIT;

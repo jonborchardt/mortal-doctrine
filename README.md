@@ -43,7 +43,7 @@ Studio labs have direct URLs, e.g. http://localhost:5174/labs/simulation.
 ```text
 apps/game        playable game (composition only)
 apps/studio      development labs (composition only)
-packages/*       engine subsystems: simulation, input, renderer (more arrive in M1)
+packages/*       engine subsystems: sim-core, simulation, input, renderer (more arrive in M1)
 characters/*     one package per fighter (none yet)
 arenas/*         one package per stage (none yet)
 scripts/         repository tooling (dependency-boundary checker)
