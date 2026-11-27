@@ -10,4 +10,11 @@ export {
   type Interpolation,
   type Key,
 } from './clip';
+export {
+  constraintsDataSchema,
+  constraintStage,
+  loadConstraints,
+  type Constraints,
+  type ConstraintsData,
+} from './constraint';
 export { orderSlots, sample, type AnimatedPose } from './sample';

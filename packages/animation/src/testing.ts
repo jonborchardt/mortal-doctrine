@@ -1,6 +1,8 @@
-// Clip fixtures for tests and the Animation Lab, for the rig fixtures in
+// Clip and constraint fixtures for tests and the Studio labs, for the rig fixtures in
 // `@mortal-doctrine/rig/testing`. Angles are local bone rotations in degrees.
+import type { RigData } from '@mortal-doctrine/rig';
 import { defineClip, key, type ClipData } from './clip';
+import type { ConstraintsData } from './constraint';
 
 /** Ease in and out. Its x is linear in the curve parameter, so y(u) = 3u² - 2u³ exactly. */
 export const SMOOTH = { bezier: [1 / 3, 0, 2 / 3, 1] } as const;
@@ -169,5 +171,156 @@ export const INVALID_CLIPS: readonly {
     name: 'an unknown interpolation mode',
     data: rotationKeys({ frame: 0, value: 0, interpolation: 'cubic' }),
     message: 'clip.bones.base.rotation.0.interpolation: interpolation must be "step", "linear" or',
+  },
+];
+
+/**
+ * For `MANNEQUIN_RIG`: the right arm (shoulder at (10, 146), segments 30 and 28) reaches for a
+ * point in front of the body, the head aims at the same point, and limits keep the elbow from
+ * folding flat and the head from turning more than 40 degrees. The head limit is in effect at
+ * this target; the elbow limit is not, so the hand reaches it.
+ */
+export const MANNEQUIN_REACH: ConstraintsData = {
+  schemaVersion: 1,
+  id: 'mannequin-reach',
+  constraints: [
+    {
+      type: 'two-bone-ik',
+      parent: 'upper-arm-right',
+      child: 'forearm-right',
+      target: { x: 50, y: 120 },
+      bend: 1,
+      mix: 1,
+    },
+    { type: 'aim', bone: 'head', target: { x: 50, y: 120 }, mix: 1 },
+    { type: 'limit', bone: 'forearm-right', min: -150, max: 150 },
+    { type: 'limit', bone: 'head', min: -40, max: 40 },
+  ],
+};
+
+/**
+ * A two-bone chain whose joint is off the parent's +x axis: `lower` sits at (12, 9) in `upper`,
+ * so the first segment is 15 long while `upper.length` is 20. The second segment is 10. The
+ * chain root is at world (5, 10), under a `base` bone turned 30 degrees.
+ */
+export const OFFSET_CHAIN_RIG: RigData = {
+  schemaVersion: 1,
+  id: 'offset-chain',
+  bones: [
+    {
+      id: 'base',
+      translation: { x: 5, y: 10 },
+      rotation: 30,
+      scale: { x: 1, y: 1 },
+      length: 0,
+    },
+    {
+      id: 'upper',
+      parent: 'base',
+      translation: { x: 0, y: 0 },
+      rotation: 20,
+      scale: { x: 1, y: 1 },
+      length: 20,
+    },
+    {
+      id: 'lower',
+      parent: 'upper',
+      translation: { x: 12, y: 9 },
+      rotation: -45,
+      scale: { x: 1, y: 1 },
+      length: 10,
+    },
+  ],
+  slots: [],
+  attachments: [],
+  anchors: [],
+};
+
+const withConstraint = (constraint: unknown) => ({
+  schemaVersion: 1,
+  id: 'small',
+  constraints: [constraint],
+});
+const TARGET = { x: 0, y: 0 };
+
+/**
+ * Constraint data `loadConstraints` must reject: one defect each. `message` is a fragment of the
+ * expected error naming the problem.
+ */
+export const INVALID_CONSTRAINTS: readonly {
+  readonly name: string;
+  readonly data: unknown;
+  readonly message: string;
+}[] = [
+  {
+    name: 'an unknown schemaVersion',
+    data: { ...MANNEQUIN_REACH, schemaVersion: 2 },
+    message: 'Unsupported constraints schemaVersion 2; supported: 1',
+  },
+  {
+    name: 'a mix above 1',
+    data: withConstraint({ type: 'aim', bone: 'tip', target: TARGET, mix: 1.5 }),
+    message: 'constraints.constraints.0.mix: Too big',
+  },
+  {
+    name: 'a negative mix',
+    data: withConstraint({
+      type: 'two-bone-ik',
+      parent: 'base',
+      child: 'tip',
+      target: TARGET,
+      bend: 1,
+      mix: -0.1,
+    }),
+    message: 'constraints.constraints.0.mix: Too small',
+  },
+  {
+    name: 'a limit with min above max',
+    data: withConstraint({ type: 'limit', bone: 'tip', min: 10, max: -10 }),
+    message: 'limit on "tip" has min 10 above max -10',
+  },
+  {
+    name: 'a limit spanning a full turn',
+    data: withConstraint({ type: 'limit', bone: 'tip', min: -180, max: 180 }),
+    message: 'limit on "tip" spans a full turn or more',
+  },
+  {
+    name: 'two limits on one bone',
+    data: {
+      schemaVersion: 1,
+      id: 'small',
+      constraints: [
+        { type: 'limit', bone: 'tip', min: 0, max: 10 },
+        { type: 'limit', bone: 'tip', min: 20, max: 30 },
+      ],
+    },
+    message: 'bone "tip" has more than one limit',
+  },
+  {
+    name: 'a bend that is not 1 or -1',
+    data: withConstraint({
+      type: 'two-bone-ik',
+      parent: 'base',
+      child: 'tip',
+      target: TARGET,
+      bend: 0,
+      mix: 1,
+    }),
+    message: 'constraints.constraints.0.bend: bend must be 1 or -1',
+  },
+  {
+    name: 'a bone id that is not kebab-case',
+    data: withConstraint({ type: 'aim', bone: 'Upper_Arm', target: TARGET, mix: 1 }),
+    message: 'id "Upper_Arm" must be kebab-case',
+  },
+  {
+    name: 'an id that is not kebab-case',
+    data: { ...MANNEQUIN_REACH, id: 'Mannequin Reach' },
+    message: 'id "Mannequin Reach" must be kebab-case',
+  },
+  {
+    name: 'an unknown constraint type',
+    data: withConstraint({ type: 'spring', bone: 'tip' }),
+    message: 'constraints.constraints.0.type',
   },
 ];
