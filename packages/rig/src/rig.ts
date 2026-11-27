@@ -66,12 +66,6 @@ export const rigDataSchema = z
 
 export type RigData = z.infer<typeof rigDataSchema>;
 
-/**
- * Entities to add to a base rig, in the same shape as a rig. Every bone names a parent, which
- * may be a base bone or another extension bone.
- */
-export type RigExtensionData = RigData;
-
 /** A bone's local transform channels. Rotation in radians. */
 export interface BonePose {
   readonly translation: Vec2;
@@ -246,12 +240,14 @@ export function loadRig(data: unknown): Rig {
 const KINDS = ['bones', 'slots', 'attachments', 'anchors'] as const;
 
 /**
- * Grafts an extension onto a base rig and returns the merged data, which keeps the base rig's
- * id. Additive only: an extension id that collides with a base bone, slot, attachment or anchor
- * throws. Pass the result to {@link loadRig}, which validates it like any other rig (for
- * example, that every grafted bone's parent exists).
+ * Grafts an extension (the entities to add, in the same shape as a rig) onto a base rig and
+ * returns the merged data, which keeps the base rig's id. Every extension bone names a parent,
+ * which may be a base bone or another extension bone. Additive only: an extension id that
+ * collides with a base bone, slot, attachment or anchor throws. Pass the result to
+ * {@link loadRig}, which validates it like any other rig (for example, that every grafted bone's
+ * parent exists).
  */
-export function extendRig(base: RigData, extension: RigExtensionData): RigData {
+export function extendRig(base: RigData, extension: RigData): RigData {
   const added = parse('rig extension', extension);
   const problems: string[] = [];
   for (const kind of KINDS) {

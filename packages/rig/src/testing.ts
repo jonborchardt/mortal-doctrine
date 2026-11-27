@@ -1,6 +1,6 @@
 // Rig fixtures for tests and the Skeleton Lab. Front views, y-up, in world units; every angle
 // is a multiple of 45 degrees so world positions can be computed by hand.
-import type { RigData, RigExtensionData } from './rig';
+import type { RigData } from './rig';
 
 type BoneData = RigData['bones'][number];
 
@@ -109,7 +109,7 @@ export const NON_HUMANOID_RIG: RigData = {
  *
  * Rest world positions on the mannequin: `tail-2` starts at (20, 90); `tail-tip` (20, 105).
  */
-export const TAIL_EXTENSION: RigExtensionData = {
+export const TAIL_EXTENSION: RigData = {
   schemaVersion: 1,
   id: 'tail',
   bones: [bone('tail-1', 'hips', 0, 0, -90, 20), bone('tail-2', 'tail-1', 20, 0, 90, 15)],

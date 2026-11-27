@@ -20,10 +20,9 @@ file format on disk.
 | Export                         | Purpose                                                                                      |
 | ------------------------------ | -------------------------------------------------------------------------------------------- |
 | `rigDataSchema`, `RigData`     | Zod schema and type of authored rig data (degrees), `schemaVersion: 1`                       |
-| `RigExtensionData`             | Authored extension: the same shape as `RigData`, holding only the entities to add            |
 | `RIG_SCHEMA_VERSION`           | The supported `schemaVersion` (`1`)                                                          |
 | `loadRig(data)`                | Validates `RigData` and returns a runtime `Rig` (radians); throws listing every problem      |
-| `extendRig(base, extension)`   | Merges an extension into base `RigData` and returns `RigData`; pass the result to `loadRig`  |
+| `extendRig(base, extension)`   | Merges an extension (a `RigData` of entities to add) into base `RigData`; then `loadRig` it  |
 | `evaluate(rig, pose)`          | World transforms per bone and slot, world position per anchor, active attachment per slot    |
 | `Rig`, `Pose`, `BonePose`      | Runtime types (radians)                                                                      |
 | `EvaluatedRig`                 | Result of `evaluate`                                                                         |

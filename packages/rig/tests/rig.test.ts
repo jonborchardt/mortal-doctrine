@@ -1,12 +1,6 @@
 import type { Transform, Vec2 } from '@mortal-doctrine/math';
 import { describe, expect, it } from 'vitest';
-import {
-  evaluate,
-  extendRig,
-  loadRig,
-  type EvaluatedRig,
-  type RigExtensionData,
-} from '../src/index';
+import { evaluate, extendRig, loadRig, type EvaluatedRig, type RigData } from '../src/index';
 import { INVALID_RIGS, MANNEQUIN_RIG, NON_HUMANOID_RIG, TAIL_EXTENSION } from '../src/testing';
 
 const EPSILON = 1e-9;
@@ -184,7 +178,7 @@ describe('evaluate: four arms and wings', () => {
 
 describe('extendRig', () => {
   const merged = extendRig(MANNEQUIN_RIG, TAIL_EXTENSION);
-  const withBone = (parent: string): RigExtensionData => ({
+  const withBone = (parent: string): RigData => ({
     ...TAIL_EXTENSION,
     bones: TAIL_EXTENSION.bones.map((bone) => ({ ...bone, parent })),
   });
@@ -223,7 +217,7 @@ describe('extendRig', () => {
       'anchor id "crown"',
     ],
   ])('rejects an id collision with a base %s', (_kind, change, fragment) => {
-    const extension = { ...TAIL_EXTENSION, ...change } as RigExtensionData;
+    const extension = { ...TAIL_EXTENSION, ...change } as RigData;
     expect(() => extendRig(MANNEQUIN_RIG, extension)).toThrow(
       `Rig extension "tail" cannot extend rig "mannequin": ${fragment} is already in the base`,
     );
@@ -236,7 +230,7 @@ describe('extendRig', () => {
   });
 
   it('rejects an extension with an unknown schemaVersion', () => {
-    const extension = { ...TAIL_EXTENSION, schemaVersion: 2 } as unknown as RigExtensionData;
+    const extension = { ...TAIL_EXTENSION, schemaVersion: 2 } as unknown as RigData;
     expect(() => extendRig(MANNEQUIN_RIG, extension)).toThrow(
       'Unsupported rig extension schemaVersion 2',
     );

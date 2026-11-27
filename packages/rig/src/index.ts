@@ -8,5 +8,4 @@ export {
   type Pose,
   type Rig,
   type RigData,
-  type RigExtensionData,
 } from './rig';
