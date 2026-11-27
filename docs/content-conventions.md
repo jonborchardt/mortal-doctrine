@@ -25,20 +25,20 @@ Packages: `@mortal-doctrine/character-<id>` in `characters/<id>/`,
 
 ## Coordinates and units
 
-| Topic            | Convention                                                                                                                                      |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| World unit       | 1 unit = 1 logical pixel at the reference viewport. **(implemented)**                                                                           |
-| Numeric type     | Gameplay positions and velocities are integers **(implemented)**; sub-unit precision is an explicit M1 decision.                                |
-| Gameplay axes    | +x right; +y **up**; y = 0 is the ground line. (Only x exists today.)                                                                           |
-| Screen axes      | Pixi/screen: +y **down**. Conversion happens only in presentation: `screenY = groundY − y`.                                                     |
-| Arena            | x ∈ [0, 960] today **(implemented)**; arenas will define their own width; camera handles framing.                                               |
-| Facing           | `facing: 1` (right) or `-1` (left). All content is authored facing right; presentation and hit geometry mirror by `facing`.                     |
-| Character origin | Ground contact point, horizontally centered between the feet (bottom-center of the pushbox). **(implemented for placeholders)**                 |
-| Angles           | Degrees in authored content files; radians at runtime. Convert once in the loader. Positive = counter-clockwise in gameplay space (y-up).       |
-| Logical viewport | 960 × 540 (16:9) **(implemented)**, scaled to the canvas host by CSS.                                                                           |
-| Rendering scale  | Textures authored at 2× logical resolution for high-DPI displays.                                                                               |
-| Gameplay time    | Integer frames at 60 Hz **(implemented)**. Move frame data (startup/active/recovery) is in frames.                                              |
-| Animation time   | Keyframe times in integer frames at 60 Hz; presentation may interpolate between them and between ticks. Animation never drives gameplay timing. |
+| Topic            | Convention                                                                                                                                                                        |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| World unit       | 1 unit = 1 logical pixel at the reference viewport. **(implemented)**                                                                                                             |
+| Numeric type     | Gameplay positions and velocities are integers **(implemented)**; sub-unit precision is an explicit M1 decision.                                                                  |
+| Gameplay axes    | +x right; +y **up**; y = 0 is the ground line. (Only x exists today.)                                                                                                             |
+| Screen axes      | Pixi/screen: +y **down**. Conversion happens only in presentation: `screenY = groundY − y`.                                                                                       |
+| Arena            | x ∈ [0, 960] today **(implemented)**; arenas will define their own width; camera handles framing.                                                                                 |
+| Facing           | `facing: 1` (right) or `-1` (left). All content is authored facing right; presentation and hit geometry mirror by `facing`.                                                       |
+| Character origin | Ground contact point, horizontally centered between the feet (bottom-center of the pushbox). **(implemented for placeholders)**                                                   |
+| Angles           | Degrees in authored content files; radians at runtime. Convert once in the loader. Positive = counter-clockwise in gameplay space (y-up).                                         |
+| Logical viewport | Default 960 × 540 (16:9) **(implemented, hard-coded today)**, scaled to the canvas host by CSS. A configurable default, not a constraint: never assume it equals the arena width. |
+| Rendering scale  | Default: textures authored at 2× the logical resolution for high-DPI displays. Configurable per asset manifest once asset loading exists.                                         |
+| Gameplay time    | Integer frames at 60 Hz **(implemented)**. Move frame data (startup/active/recovery) is in frames.                                                                                |
+| Animation time   | Keyframe times in integer frames at 60 Hz; presentation may interpolate between them and between ticks. Animation never drives gameplay timing.                                   |
 
 ## Skeletons are per-character
 

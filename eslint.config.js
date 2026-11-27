@@ -26,6 +26,15 @@ export default defineConfig(
     },
     rules: {
       'no-restricted-imports': ['error', { patterns: [noDeepImports] }],
+      // scripts/check-boundaries.ts finds imports by scanning source text, so specifiers must
+      // be visible literals. Replace with module-graph analysis if this ever becomes limiting.
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'ImportExpression[source.type!="Literal"]',
+          message: 'Use a string-literal specifier; computed imports evade boundary checks.',
+        },
+      ],
     },
   },
   {

@@ -50,13 +50,34 @@ A package declares its layer in `package.json`:
   `characters/x` → `@mortal-doctrine/character-x`, `arenas/x` → `@mortal-doctrine/arena-x`);
 - a non-app package lacks `exports` or `README.md`.
 
+**Known limitation (accepted for now):** the checker finds imports by regex over source text
+(`import … from '…'`, `export … from '…'`, `import('…')`, side-effect imports). It does not build
+a module graph, so it cannot see computed specifiers. Therefore computed `import()` specifiers
+are prohibited everywhere and ESLint rejects them (`no-restricted-syntax`). Upgrade to real
+module-graph analysis (TypeScript resolution or a dedicated tool) only when this rule becomes a
+practical obstacle or a violation slips through.
+
 ESLint adds file-level rules: no deep imports (`@mortal-doctrine/x/internal`), no React outside
 `apps/`, and in `packages/simulation` no `pixi.js`, `node:*`, `Date` or `Math.random`. The
 simulation `tsconfig` has no DOM lib and no ambient types, so browser and Node APIs are type
 errors there.
 
-**Why `input` is layer 4:** it reads browser keyboard events. It translates them into the
-simulation's `PlayerInput` type, so it depends downward on `simulation`.
+**Input is split across two layers.**
+
+- _Device capture_ (keyboard, gamepad, bindings, per-frame sampling and buffering of raw device
+  state) reads browser APIs, so it is `presentation` (today: `@mortal-doctrine/input`). It
+  produces device-neutral per-frame input values defined by the simulation.
+- _Command interpretation_ (input history, motion recognition such as quarter-circles, charge
+  inputs, chords, buffering windows, negative edge) is gameplay logic. It is deterministic,
+  headless `simulation`-layer code that consumes recorded input frames. That makes it testable
+  from scripted input and identical in replays and rollback. It never sees a DOM event.
+
+**Skeletal work is split across three responsibilities.**
+
+- _Rig evaluation_ (bone hierarchy, attachments, local→world transforms, IK) and _animation
+  evaluation_ (keyframes, interpolation, blending, deformation weights) are `animation` layer:
+  pure TypeScript, no PixiJS or browser APIs, runnable in Node tests.
+- _Skeletal rendering_ (turning an evaluated pose into Pixi sprites/meshes) is `presentation`.
 
 When a new simulation-layer package (e.g. `combat`) arrives, add the same determinism ESLint
 block for it in `eslint.config.js` and give it a DOM-free `tsconfig` (copy `packages/simulation`).
@@ -132,15 +153,23 @@ function step(state, inputs): { state: SimulationState; events: readonly Simulat
 
 `@mortal-doctrine/renderer` creates a PixiJS application, appends its canvas to a host element,
 draws snapshots and exposes `onFrame`, `fps` and `frameCpuMs`. It holds Pixi objects privately and
-never mutates simulation state. Logical viewport 960×540, CSS-scaled to the host width.
+never mutates simulation state. It draws into a 960×540 logical viewport, CSS-scaled to the host
+width.
+
+The 960×540 viewport and the 2× texture resolution are **defaults, not architectural
+constraints**. Today the renderer hard-codes them and borrows `ARENA_WIDTH` from the simulation as
+its viewport width. Making viewport size, resolution and the world→screen mapping configurable
+(with the camera owning framing) is rendering-infrastructure work (M1). No code may assume the
+logical viewport equals the arena width.
 
 ## Animation — Intended
 
 Hierarchical 2D skeletons with illustrated attachments; declarative, serializable,
 programmatically authorable definitions; keyframes, interpolation, IK, mesh deformation and
-swappable attachments; per-character skeletal extensions (extra limbs, wings, summons). Evaluation
-is presentation-independent (layer 3) so that any gameplay-relevant transform can be evaluated
-deterministically. Visual animation never determines combat timing; move frame data does.
+swappable attachments; per-character skeletal extensions (extra limbs, wings, summons). Rig and
+animation evaluation are presentation-independent (layer 3) so that any gameplay-relevant
+transform can be evaluated deterministically; skeletal rendering is a separate presentation
+concern (see Layers). Visual animation never determines combat timing; move frame data does.
 
 ## Studio — Implemented (convention), Intended (labs)
 

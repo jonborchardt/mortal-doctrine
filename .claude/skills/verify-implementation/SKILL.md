@@ -27,18 +27,27 @@ If formatting fails, run `pnpm format` and review what it changed. Any other fai
 find the cause. Never weaken a gate (see CLAUDE.md). If an unrelated pre-existing failure blocks
 you, confirm it also fails on the base commit and report it with the exact command and output.
 
-## 4. Browser verification
+## 4. Behavioral evidence
 
-For visual or interactive changes, open the relevant app or lab URL, exercise the change, and
-capture screenshots (save them outside the repository or delete them afterward). Check the
-browser console for errors.
+- **Simulation changes:** scripted-input tests showing the new behavior frame by frame, plus
+  determinism (same inputs ⇒ same serialized state) and serialize/restore equivalence.
+- **Visual or interactive changes:** a Playwright spec that exercises the change, plus
+  screenshots (lab URL at a known fixture state; before/after for changed visuals) saved outside
+  the repository or deleted afterward. Check the browser console for errors.
+- **Resource-owning components:** a test proving teardown (e.g. exactly one canvas after
+  StrictMode remount, listeners removed after `dispose`).
+- **Public API changes:** every consumer still builds and passes (`pnpm check` covers the
+  workspace); name the consumers in the report.
+- Prefer Playwright-managed servers. Do not leave `pnpm dev` running in the background: on
+  Windows, killing the parent leaves `vite` children behind (`docs/development.md`).
 
 ## 5. Inspect the diff
 
 `git status` and `git diff`: no stray files (screenshots, logs, `.only`), no unrelated formatting
 or refactors, no new dependency without a reason, no root-config or shared-contract change that
-is not called out, docs updated where behavior or conventions changed. Ensure no dev servers or
-other processes you started are still running.
+is not called out, no edits to unrelated packages, no work belonging to a downstream ticket, docs
+updated where behavior or conventions changed. Ensure no dev servers or other processes you
+started are still running (on Windows, check for leftover `node … vite` processes).
 
 ## 6. Report
 

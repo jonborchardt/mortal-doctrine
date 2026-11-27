@@ -8,10 +8,20 @@ Commands are listed in the [README](../README.md#commands). This page covers wor
 - Default ports: game 5173, Studio 5174. Both use `strictPort`: if the port is taken, Vite exits
   with an error instead of silently moving. Override per run:
   `pnpm dev:game --port 6100` (arguments pass through to Vite).
-- Stop with Ctrl+C in the terminal that started them. On Windows, killing only the parent `pnpm`
-  process (e.g. from a task manager or a background-job runner) can orphan the `vite` children;
-  stop those too.
+- Stop with Ctrl+C in the terminal that started them. See the Windows cleanup debt below.
 - `pnpm test:e2e` never reuses a running dev server; it starts and stops its own on free ports.
+
+## Known technical debt
+
+- **Windows dev-server cleanup.** Killing only the parent `pnpm` process (from Task Manager or
+  a background-job runner, rather than Ctrl+C in its console) leaves the `vite` children running
+  on Windows, because the kill does not propagate to the process tree. Workaround: stop dev
+  servers with Ctrl+C, or end the leftover `node … vite` processes. Orch's checks never run
+  `pnpm dev`: they are `pnpm install`, `pnpm check` and `pnpm test:e2e`, whose Vite servers
+  Playwright starts and tears down itself (verified to leave no processes on Windows). Agents
+  doing browser verification should therefore use Playwright specs, not background
+  `pnpm dev`. If unattended runs ever need dev servers, fix this first, e.g. with a small
+  cross-platform launcher that kills the process tree.
 
 ## Adding a workspace package
 

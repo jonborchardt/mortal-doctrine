@@ -13,8 +13,9 @@ Authoritative references: `docs/architecture.md` (layers, simulation rules, even
 
 - New package only if it has its own responsibility, public API and tests, and a consumer in this
   ticket. Otherwise add a module inside the package that owns the behavior.
-- Pick the layer from what it must import, not what is convenient: gameplay → `simulation`;
-  rig/animation evaluation → `animation`; anything touching Pixi, DOM, audio or devices →
+- Pick the layer from what it must import, not what is convenient: gameplay, including input
+  command interpretation → `simulation`; rig/animation evaluation → `animation`; anything
+  touching Pixi, DOM, audio or devices (including device input capture and skeletal rendering) →
   `presentation`; shared math/contracts used by ≥2 packages → `foundation`.
 - If it needs a higher layer, the design is wrong — invert the dependency (higher layer passes
   data or callbacks down) instead.
@@ -41,7 +42,9 @@ Copy the shape of `packages/simulation`:
 - Export only what consumers need from `src/index.ts`; everything else stays internal.
 - Simulation layer: pure functions over readonly, serializable state; integer frames; no clocks
   or `Math.random`; deterministic ordering; events as returned typed arrays (see architecture).
-- Put reusable fixtures in `src/testing.ts` (exported as `./testing`).
+- Put reusable fixtures in `src/testing.ts` (exported as `./testing`): small, named,
+  representative cases (typical, boundary, degenerate), not one trivial value.
+- Implement only what this ticket's consumers need. Roadmap mentions are not consumers.
 
 ## 4. Test
 
@@ -51,7 +54,9 @@ Copy the shape of `packages/simulation`:
 
 ## 5. Lab and integration
 
-- If the subsystem has observable behavior, add a Studio lab (skill `create-studio-lab`).
+- Visual or interactive subsystems get a Studio lab (skill `create-studio-lab`). Pure math and
+  infrastructure packages do not; their tests and fixtures are the evidence.
+- If you changed an existing package's API, update and re-verify its consumers in this ticket.
 - Wire into `apps/game` only if the ticket asks for it.
 - Document integration points (who calls it, what it consumes/produces) in its README.
 
