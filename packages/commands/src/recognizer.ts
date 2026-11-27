@@ -152,14 +152,12 @@ function nextCharge(
 ): ChargeCounter {
   const charge = definition.charge;
   if (!charge) return counter;
-  const held =
-    charge.direction === 'forward'
-      ? now.forward === 1
-      : charge.direction === 'back'
-        ? now.forward === -1
-        : charge.direction === 'up'
-          ? now.y === 1
-          : now.y === -1;
+  const held = {
+    forward: now.forward === 1,
+    back: now.forward === -1,
+    up: now.y === 1,
+    down: now.y === -1,
+  }[charge.direction];
   const run = held ? Math.min(counter.run + 1, charge.frames) : 0;
   const since = run === charge.frames ? 0 : Math.min(counter.since + 1, definition.maxFrames + 1);
   return { run, since };
