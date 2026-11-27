@@ -1,6 +1,2 @@
-export {
-  createSkeletonRenderable,
-  type SkeletonRenderable,
-  type SkeletonRenderableOptions,
-} from './renderable';
+export { createSkeletonRenderable, type SkeletonRenderable } from './renderable';
 export { slotDisplayTransform, type Facing } from './transform';

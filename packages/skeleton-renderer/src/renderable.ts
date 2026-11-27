@@ -5,7 +5,7 @@ import type { LoadedTextures, Renderable, RenderFrame } from '@mortal-doctrine/r
 import { evaluate, type Rig } from '@mortal-doctrine/rig';
 import { slotDisplayTransform, type Facing } from './transform';
 
-export interface SkeletonRenderableOptions {
+interface SkeletonRenderableOptions {
   readonly rig: Rig;
   /** The renderer layer to mount in. */
   readonly layer: string;

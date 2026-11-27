@@ -6,7 +6,11 @@ import {
 } from '@mortal-doctrine/renderer';
 import type { Pose, Rig } from '@mortal-doctrine/rig';
 import { createInitialState } from '@mortal-doctrine/simulation';
-import { createSkeletonRenderable, type Facing } from '@mortal-doctrine/skeleton-renderer';
+import {
+  createSkeletonRenderable,
+  type Facing,
+  type SkeletonRenderable,
+} from '@mortal-doctrine/skeleton-renderer';
 
 const MANIFEST = '/fixtures/skeleton/manifest.json';
 // Same framing as the SVG debug view (260 × 210 world units, ground line 15 above the bottom
@@ -32,7 +36,7 @@ export function SkeletonCanvas({
   const [renderer, setRenderer] = useState<ArenaRenderer>();
   const [error, setError] = useState<string | null>(null);
   const latest = useRef({ pose, facing });
-  const setPoseRef = useRef<(pose: Pose, facing: Facing) => void>(undefined);
+  const renderableRef = useRef<SkeletonRenderable>(undefined);
   // Tail of the texture loads so far: the manifest's URLs have one owner at a time, so a load
   // starts only after the previous one finished and (if its rig was dropped) was released.
   const loads = useRef<Promise<void>>(Promise.resolve());
@@ -40,7 +44,7 @@ export function SkeletonCanvas({
   // React only hands over inputs on change; drawing happens in the renderer's frame callback.
   useEffect(() => {
     latest.current = { pose, facing };
-    setPoseRef.current?.(pose, facing);
+    renderableRef.current?.setPose(pose, facing, CHARACTER_ORIGIN);
   }, [pose, facing]);
 
   useEffect(() => {
@@ -79,10 +83,8 @@ export function SkeletonCanvas({
         const textures = await loadTextureManifest(MANIFEST);
         const renderable = createSkeletonRenderable({ rig, layer: 'fighters', textures });
         if (cancelled) return renderable.destroy();
-        const setPose = (next: Pose, nextFacing: Facing) =>
-          renderable.setPose(next, nextFacing, CHARACTER_ORIGIN);
-        setPose(latest.current.pose, latest.current.facing);
-        setPoseRef.current = setPose;
+        renderable.setPose(latest.current.pose, latest.current.facing, CHARACTER_ORIGIN);
+        renderableRef.current = renderable;
         unregister = renderer.register(renderable);
         setError(null);
       })
@@ -92,7 +94,7 @@ export function SkeletonCanvas({
       });
     return () => {
       cancelled = true;
-      setPoseRef.current = undefined;
+      renderableRef.current = undefined;
       unregister();
     };
   }, [renderer, rig]);
