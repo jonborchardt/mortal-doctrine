@@ -36,8 +36,15 @@ Every simulation-layer subsystem must show:
   `@mortal-doctrine/<pkg>/testing`. Production code never imports `testing`.
 - Simulation fixtures today: `held(...bits)` (builds an `InputFrame`), `IDLE`, `P1_RIGHT`,
   `P1_LEFT`, `SEEDED_OPTIONS` (non-default seed and history capacity), `walkCycleScript` (an
-  `InputProvider` mapping absolute frame → `FrameInputs`) and
+  `InputProvider` mapping absolute frame → `FrameInputs`; left/right only) and
   `runFrames(state, script, count) → { state, events }`.
+- Movement fixtures (`@mortal-doctrine/movement/testing`): `RAMPED_MOVEMENT_PARAMETERS` (the
+  second placeholder set, with acceleration and friction ramps) and `PARAMETER_SETS`,
+  `MOVEMENT_SCENARIOS` (walk forward/back, crouch, neutral/forward/back jump, corner push,
+  cross-up, max separation; player 1's scripted input), the mirror helpers (`mirrorFrame`,
+  `mirrorInputs`, `mirrorFighter`, `mirrorSlice`, `mirrorEvent`) for symmetry tests and the
+  `runMovement` harness. Kinematics frame tables in `packages/movement/tests` are literals
+  derived independently of the code under test.
 - Command fixtures (`@mortal-doctrine/commands/testing`): generic definitions (`GENERIC_COMMANDS`
   and each one by name), `MOTION_CASES` with `spanned` for window boundary tables, `mirror`,
   `COMMAND_SCRIPTS` / `commandCycleScript` (inputs for both players), and the

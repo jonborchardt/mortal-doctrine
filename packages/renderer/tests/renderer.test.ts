@@ -37,7 +37,11 @@ describe('default view', () => {
 describe('blendFighterX', () => {
   const at = (frame: number, x0: number): SimulationState => {
     const initial = createInitialState();
-    return { ...initial, frame, fighters: [{ x: x0 }, initial.fighters[1]] };
+    return {
+      ...initial,
+      frame,
+      fighters: [{ ...initial.fighters[0], x: x0 }, initial.fighters[1]],
+    };
   };
 
   it('lerps x between a snapshot one frame behind and the current one', () => {

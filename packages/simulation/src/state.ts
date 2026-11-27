@@ -4,9 +4,18 @@ import {
   requiredHistory,
   type CommandDefinition,
 } from '@mortal-doctrine/commands';
+import {
+  arenaRulesSchema,
+  DEFAULT_ARENA_RULES,
+  DEFAULT_MOVEMENT_PARAMETERS,
+  initialMovement,
+  movementSliceSchema,
+  widestPushboxWidth,
+  type ArenaRules,
+  type MovementParameters,
+} from '@mortal-doctrine/movement';
 import { int32Schema } from '@mortal-doctrine/sim-core';
 import { z } from 'zod';
-import { fightersSliceSchema, initialFighters } from './fighters';
 import { initialInput, inputSliceSchema } from './input';
 import { initialRng, rngSliceSchema } from './rng';
 
@@ -16,10 +25,30 @@ export const simulationStateSchema = z
     frame: int32Schema.nonnegative(),
     rng: rngSliceSchema,
     input: inputSliceSchema,
-    fighters: fightersSliceSchema,
+    arena: arenaRulesSchema,
+    fighters: movementSliceSchema,
     commands: commandsSliceSchema,
   })
   .superRefine((state, ctx) => {
+    // The arena must fit both fighters' widest pushboxes side by side, and a separation limit
+    // must leave room for them not to overlap.
+    const [w0, w1] = state.fighters.map((fighter) => widestPushboxWidth(fighter.params));
+    const widths = (w0 ?? 0) + (w1 ?? 0);
+    if (state.arena.width < widths) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['arena', 'width'],
+        message: `must be at least ${widths}, the sum of both fighters' widest pushbox widths`,
+      });
+    }
+    const { maxSeparation } = state.arena;
+    if (maxSeparation !== undefined && maxSeparation <= widths / 2) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['arena', 'maxSeparation'],
+        message: `must be greater than ${widths / 2}, the sum of both fighters' widest pushbox half-widths`,
+      });
+    }
     state.commands.definitions.forEach((definition, index) => {
       if (requiredHistory(definition) > state.input.capacity) {
         ctx.addIssue({
@@ -44,17 +73,45 @@ export interface InitialStateOptions {
    * Default none. Throws naming the failing path, or if one needs more than `historyCapacity`.
    */
   readonly commands?: readonly CommandDefinition[];
+  /**
+   * Movement parameters for player 0 and player 1 (`@mortal-doctrine/movement`). Default
+   * `DEFAULT_MOVEMENT_PARAMETERS` for both.
+   */
+  readonly movement?: readonly [MovementParameters, MovementParameters];
+  /** Gameplay arena rules. Default `DEFAULT_ARENA_RULES` (width 96000, no separation limit). */
+  readonly arena?: ArenaRules;
 }
 
+/**
+ * Builds and validates the initial state: fighters standing `width / 2` apart (x 24000 and
+ * 72000 by default; closer if `maxSeparation` is smaller), facing each other. Throws naming the
+ * failing path for invalid options.
+ */
 export function createInitialState(options: InitialStateOptions = {}): SimulationState {
   const input = initialInput(options.historyCapacity);
-  return {
+  const commands = createCommandsSlice(options.commands ?? [], input.capacity);
+  const params = options.movement ?? [DEFAULT_MOVEMENT_PARAMETERS, DEFAULT_MOVEMENT_PARAMETERS];
+  // Positions derive from the arena, so a malformed arena is reported before they are computed.
+  const arenaResult = arenaRulesSchema.safeParse(options.arena ?? DEFAULT_ARENA_RULES);
+  if (!arenaResult.success) throw invalid(arenaResult.error, 'arena');
+  const arena = arenaResult.data;
+  const result = simulationStateSchema.safeParse({
     frame: 0,
     rng: initialRng(options.seed),
     input,
-    fighters: initialFighters(),
-    commands: createCommandsSlice(options.commands ?? [], input.capacity),
-  };
+    arena,
+    fighters: initialMovement(params, arena),
+    commands,
+  });
+  if (!result.success) throw invalid(result.error, 'state');
+  return result.data;
+}
+
+function invalid(error: z.ZodError, root: string): Error {
+  const problems = error.issues.map(
+    (issue) => `${[root, ...issue.path.map(String)].join('.')}: ${issue.message}`,
+  );
+  return new Error(`Invalid simulation state: ${problems.join('; ')}`);
 }
 
 export const SCHEMA_VERSION = 1;
@@ -78,11 +135,6 @@ export function deserializeState(json: string): SimulationState {
     );
   }
   const result = simulationStateSchema.safeParse('state' in envelope ? envelope.state : undefined);
-  if (!result.success) {
-    const problems = result.error.issues.map(
-      (issue) => `${['state', ...issue.path.map(String)].join('.')}: ${issue.message}`,
-    );
-    throw new Error(`Invalid simulation state: ${problems.join('; ')}`);
-  }
+  if (!result.success) throw invalid(result.error, 'state');
   return result.data;
 }

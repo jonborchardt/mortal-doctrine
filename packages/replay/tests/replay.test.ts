@@ -489,7 +489,8 @@ describe('hashState', () => {
   });
 
   it('matches the pinned value, so a change to state serialization is noticed', () => {
-    expect(hashState(initial)).toBe('58bc5552');
-    expect(hashState(later)).toBe('9d2dc23d');
+    // Re-pinned for M1.05: state gained `arena` and the full fighter movement state.
+    expect(hashState(initial)).toBe('ed5125eb');
+    expect(hashState(later)).toBe('3861d9dc');
   });
 });
