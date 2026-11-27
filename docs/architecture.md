@@ -26,14 +26,14 @@ future milestones, not yet built). Decision records live in [decisions/](decisio
 
 ## Layers — Implemented (enforced)
 
-| #   | Layer          | Contains                                                        | Today               |
-| --- | -------------- | --------------------------------------------------------------- | ------------------- |
-| 1   | `foundation`   | math primitives, narrowly scoped shared contracts               | `sim-core`, `math`  |
-| 2   | `simulation`   | headless gameplay: state, stepping, movement, collision, combat | `simulation`        |
-| 3   | `animation`    | presentation-independent skeleton and animation evaluation      | —                   |
-| 4   | `presentation` | rendering, effects, camera, audio, browser device adapters      | `renderer`, `input` |
-| 5   | `content`      | `characters/*`, `arenas/*`                                      | —                   |
-| 6   | `application`  | `apps/*` composition and tooling                                | `game`, `studio`    |
+| #   | Layer          | Contains                                                        | Today                  |
+| --- | -------------- | --------------------------------------------------------------- | ---------------------- |
+| 1   | `foundation`   | math primitives, narrowly scoped shared contracts               | `sim-core`, `math`     |
+| 2   | `simulation`   | headless gameplay: state, stepping, movement, collision, combat | `simulation`, `replay` |
+| 3   | `animation`    | presentation-independent skeleton and animation evaluation      | —                      |
+| 4   | `presentation` | rendering, effects, camera, audio, browser device adapters      | `renderer`, `input`    |
+| 5   | `content`      | `characters/*`, `arenas/*`                                      | —                      |
+| 6   | `application`  | `apps/*` composition and tooling                                | `game`, `studio`       |
 
 A package declares its layer in `package.json`:
 
@@ -184,8 +184,9 @@ DOM-free `tsconfig` (copy `packages/simulation`); the determinism rules then app
    about to be processed.
 3. **Gameplay input history** — the bounded `input` slice of simulation state, used by gameplay
    interpretation.
-4. **Replay recording** — the complete per-tick `FrameInputs` stream, captured by the runner or a
-   recorder outside simulation state (M1.15). It never derives from the bounded history.
+4. **Replay recording** — the complete per-tick `FrameInputs` stream, captured outside simulation
+   state by `@mortal-doctrine/replay`, whose recorder wraps the runner's input provider. It never
+   derives from the bounded history.
 
 **InputFrame.** A non-negative integer bitmask: `LEFT`, `RIGHT`, `UP`, `DOWN` on bits 0–3,
 generic buttons `A1`–`A6` on bits 4–9 (no gameplay meaning yet); other bits must be zero, and new
@@ -260,10 +261,11 @@ concern (see Layers). Visual animation never determines combat timing; move fram
 
 Each lab is a folder `apps/studio/src/labs/<id>/` with a `lab.ts` exporting a typed
 `LabDefinition`; discovery is automatic (`import.meta.glob`). Every lab has the stable URL
-`/labs/<id>`. The Simulation Lab and the Input Lab exist. See [development.md](development.md#adding-a-studio-lab).
+`/labs/<id>`. The Simulation, Input and Replay Labs exist. See [development.md](development.md#adding-a-studio-lab).
 
 ## Deferred functionality (explicit non-goals of M0)
 
 Combat, hitboxes, collision, jumping, combos, special moves, skeletal animation, characters,
-arenas, effects, camera, audio, AI, replays, menus, settings, persistence, networking, rollback,
-render interpolation. (The seeded RNG, simulation events and gamepad input now exist; see above.)
+arenas, effects, camera, audio, AI, menus, settings, persistence, networking, rollback,
+render interpolation. (The seeded RNG, simulation events, gamepad input and replays now exist;
+see above.)
