@@ -116,3 +116,22 @@ test('arrow keys in live mode drive player 1 instead of the source select', asyn
   await expect(page.getByTestId('command-frame')).toHaveText('1');
   await expect(page.getByTestId('command-timeline').getByRole('row').nth(1)).toHaveText('P1↑');
 });
+
+test('arrow keys keep driving player 1 when focus returns to the source select', async ({
+  page,
+}) => {
+  await page.goto(COMMAND_LAB);
+  const source = page.getByRole('combobox', { name: 'Input source' });
+  await source.selectOption({ label: 'Live input (keyboard / gamepad)' });
+  await expect(page.getByTestId('command-frame')).toHaveText('0');
+  await page.getByRole('button', { name: 'Resume' }).focus();
+  await page.keyboard.press('Shift+Tab');
+  await expect(source).toBeFocused();
+  await page.keyboard.down('ArrowUp');
+  await expect(source).toHaveValue('live');
+  await page.getByRole('button', { name: 'Step' }).click();
+  await page.keyboard.up('ArrowUp');
+  await expect(source).toHaveValue('live');
+  await expect(page.getByTestId('command-frame')).toHaveText('1');
+  await expect(page.getByTestId('command-timeline').getByRole('row').nth(1)).toHaveText('P1↑');
+});

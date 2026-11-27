@@ -25,7 +25,7 @@ export const simulationStateSchema = z
         ctx.addIssue({
           code: 'custom',
           path: ['commands', 'definitions', index],
-          message: `needs ${requiredHistory(definition)} history frames, more than capacity ${state.input.capacity}`,
+          message: `needs ${requiredHistory(definition)} history frames, more than historyCapacity ${state.input.capacity}`,
         });
       }
     });

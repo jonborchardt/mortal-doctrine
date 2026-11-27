@@ -23,6 +23,9 @@ const FRAMES_SHOWN = 40;
 const LOG_KEPT = 50;
 const PLAYERS = [0, 1] as const;
 const IDLE: FrameInputs = [0, 0];
+const GAMEPLAY_KEYS = new Set(
+  DEFAULT_PLAYER_BINDINGS.flatMap(({ keyboard }) => Object.values(keyboard ?? {}).flat()),
+);
 
 interface Session {
   readonly runner: SimulationRunner;
@@ -158,11 +161,14 @@ export function CommandLab() {
             aria-label="Input source"
             className="rounded bg-neutral-800 px-2 py-1 text-sm text-neutral-100"
             value={source}
-            onChange={(event) => {
-              // A focused select would take the arrow keys that drive player 1 and switch away
-              // from live input.
-              if (event.target.value === LIVE) event.target.blur();
-              choose(event.target.value);
+            onChange={(event) => choose(event.target.value)}
+            onKeyDown={(event) => {
+              // While live, a focused select would turn gameplay keys (arrows, letter type-ahead)
+              // into a source change. The key still reaches the window-level capture; Alt+Arrow,
+              // Tab, Enter, Space and the mouse still pick another source.
+              if (source === LIVE && !event.altKey && GAMEPLAY_KEYS.has(event.code)) {
+                event.preventDefault();
+              }
             }}
           >
             {COMMAND_SCRIPTS.map((script) => (

@@ -124,8 +124,8 @@ export function updateCommands(
     };
     const now = relative(0);
     return slice.definitions.map((definition, index) => {
-      const previous = slice.charges[player][index] ?? null;
-      const counter = previous && nextCharge(previous, definition, now);
+      const previous = slice.charges[player][index];
+      const counter = previous ? nextCharge(previous, definition, now) : null;
       if (
         triggered(definition, at) &&
         (!counter || counter.since <= definition.maxFrames) &&
@@ -172,13 +172,16 @@ function triggered(definition: CommandDefinition, at: (ago: number) => InputFram
     const bit = InputBit[button];
     return (at(1) & bit) !== 0 && (at(0) & bit) === 0;
   }
-  const window = buttons.length > 1 ? chordWindow : 0;
+  const maxAge = buttons.length > 1 ? chordWindow : 0;
   let pressedNow = false;
   for (const button of buttons) {
     const bit = InputBit[button];
     if ((at(0) & bit) === 0) return false;
     let age = 0;
-    while ((at(age + 1) & bit) !== 0) if (++age > window) return false;
+    while ((at(age + 1) & bit) !== 0) {
+      age += 1;
+      if (age > maxAge) return false;
+    }
     if (age === 0) pressedNow = true;
   }
   return pressedNow;
