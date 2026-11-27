@@ -33,20 +33,21 @@ export const simulationStateSchema = z
     // The arena must fit both fighters' widest pushboxes side by side, and a separation limit
     // must leave room for them not to overlap.
     const [w0, w1] = state.fighters.map((fighter) => widestPushboxWidth(fighter.params));
-    const widths = (w0 ?? 0) + (w1 ?? 0);
-    if (state.arena.width < widths) {
+    const widthSum = (w0 ?? 0) + (w1 ?? 0);
+    const halfWidthSum = widthSum / 2;
+    if (state.arena.width < widthSum) {
       ctx.addIssue({
         code: 'custom',
         path: ['arena', 'width'],
-        message: `must be at least ${widths}, the sum of both fighters' widest pushbox widths`,
+        message: `must be at least ${widthSum}, the sum of both fighters' widest pushbox widths`,
       });
     }
     const { maxSeparation } = state.arena;
-    if (maxSeparation !== undefined && maxSeparation <= widths / 2) {
+    if (maxSeparation !== undefined && maxSeparation <= halfWidthSum) {
       ctx.addIssue({
         code: 'custom',
         path: ['arena', 'maxSeparation'],
-        message: `must be greater than ${widths / 2}, the sum of both fighters' widest pushbox half-widths`,
+        message: `must be greater than ${halfWidthSum}, the sum of both fighters' widest pushbox half-widths`,
       });
     }
     state.commands.definitions.forEach((definition, index) => {

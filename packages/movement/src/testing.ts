@@ -51,7 +51,7 @@ export interface MovementScenario {
   readonly name: string;
   /** Ticks worth showing; the inputs are neutral afterwards. */
   readonly frames: number;
-  /** Arena rules other than the default. */
+  /** The scenario's full arena rules; omitted means `DEFAULT_ARENA_RULES`. */
   readonly arena?: ArenaRules;
   readonly inputs: (frame: number) => FrameInputs;
 }

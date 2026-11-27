@@ -84,7 +84,7 @@ describe('simulation', () => {
     expect(right.fighters[0].x).toBe(ARENA_WIDTH - FIGHTER_WIDTH - FIGHTER_WIDTH / 2);
   });
 
-  it('walks by the resolved direction: left + right does not move, buttons are ignored', () => {
+  it('moves by the resolved direction: left + right does not move, buttons are ignored, up + down jumps', () => {
     const start = createInitialState();
     const { state } = step(start, [held(LEFT, RIGHT), held(RIGHT, A1, A6)]);
     expect(state.fighters[0].x).toBe(start.fighters[0].x);

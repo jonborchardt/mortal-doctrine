@@ -63,8 +63,11 @@ start-of-tick facing.
 is at a wall at the end of the tick and was not at its start, whatever caused it. Order: player
 0 before player 1; within a player `jump`, `land`, `wall-contact`.
 
-All arithmetic is integer addition, `decelerate` and halving of even widths, following the
+All arithmetic is integer addition, `decelerate`, halving of even widths and, in rules 4 and 5,
+ceiling halving (`Math.ceil(n / 2)`) of the separation excess and the overlap, following the
 `sim-core` movement pattern, so there is no rounding drift and mirrored runs are exact mirrors.
+The ceiling is the one deliberate exception to truncating division: it makes the two shares cover
+an odd excess or overlap in full.
 
 ## API
 

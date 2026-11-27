@@ -481,16 +481,17 @@ describe('movement determinism', () => {
 
 describe('movement validation', () => {
   const withParam = (player: 0 | 1, path: string[], value: unknown) => {
-    const params = JSON.parse(JSON.stringify(DEFAULT_MOVEMENT_PARAMETERS)) as Record<
-      string,
-      unknown
-    >;
-    let node = params;
+    // The copy is deliberately invalid at `path`; the type only lets it into the options.
+    const params = JSON.parse(JSON.stringify(DEFAULT_MOVEMENT_PARAMETERS)) as MovementParameters;
+    let node: Record<string, unknown> = params;
     for (const key of path.slice(0, -1)) node = node[key] as Record<string, unknown>;
     node[path.at(-1) ?? ''] = value;
-    const pair = [DEFAULT_MOVEMENT_PARAMETERS, DEFAULT_MOVEMENT_PARAMETERS];
-    pair[player] = params as unknown as MovementParameters;
-    return pair as unknown as readonly [MovementParameters, MovementParameters];
+    const pair: [MovementParameters, MovementParameters] = [
+      DEFAULT_MOVEMENT_PARAMETERS,
+      DEFAULT_MOVEMENT_PARAMETERS,
+    ];
+    pair[player] = params;
+    return pair;
   };
   const paramCases: [string, 0 | 1, string[], unknown][] = [
     ['a non-integer speed', 0, ['walkForwardSpeed'], 1.5],

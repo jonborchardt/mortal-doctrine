@@ -318,7 +318,7 @@ exist. See [development.md](development.md#adding-a-studio-lab).
 
 ## Deferred functionality (explicit non-goals of M0)
 
-Combat, hitboxes, collision, jumping, combos, special moves, skeletal animation, characters,
+Combat, hitboxes, combos, special moves, skeletal animation, characters,
 arenas, effects, camera, audio, AI, menus, settings, persistence, networking, rollback.
 (The seeded RNG, simulation events, gamepad input, replays, opt-in render interpolation,
 movement with jumping and pushbox collision, and skeletal animation now exist; see above.)

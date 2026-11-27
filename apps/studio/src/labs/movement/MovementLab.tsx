@@ -14,7 +14,11 @@ import {
 } from '@mortal-doctrine/simulation';
 
 const PLAYERS = [0, 1] as const;
+// Both measure at least 4.5:1 against the view background (#171717): 4.67:1 and 5.09:1.
 const COLORS = ['#e0533d', '#3d8be0'] as const;
+// Player 2 is also dashed, and each box carries a "P1"/"P2" label, so identity is not colour only.
+const DASHES = [undefined, '6 3'] as const;
+const FIELDS = ['x', 'y', 'vx', 'vy', 'facing', 'state'] as const;
 const LOG_KEPT = 50;
 const TRACE_KEPT = 3600;
 // View in world units, y up: ground at 0, room above for the highest jump.
@@ -74,6 +78,7 @@ export function MovementLab() {
     };
     const boxes = PLAYERS.map((p) => svg.querySelector<SVGRectElement>(`[data-box="${p}"]`));
     const traces = PLAYERS.map((p) => svg.querySelector<SVGPolylineElement>(`[data-trace="${p}"]`));
+    const labels = PLAYERS.map((p) => svg.querySelector<SVGTextElement>(`[data-label="${p}"]`));
 
     // Per-frame work stays outside React; React only handles control clicks.
     let last: number | undefined;
@@ -100,7 +105,7 @@ export function MovementLab() {
           write(`p${player}-vy`, String(fighter.vy));
           write(`p${player}-facing`, fighter.facing === 1 ? 'right' : 'left');
           write(`p${player}-state`, stance(fighter));
-          drawBox(boxes[player], fighter);
+          drawBox(boxes[player], labels[player], fighter);
           traces[player]?.setAttribute('points', session.trace[player].join(' '));
         }
         logList.replaceChildren(
@@ -157,7 +162,8 @@ export function MovementLab() {
   const buttonClass =
     'rounded bg-neutral-800 px-3 py-1 text-sm hover:bg-neutral-700 disabled:opacity-40';
   const selectClass = 'rounded bg-neutral-800 px-2 py-1 text-sm text-neutral-100';
-  const width = DEFAULT_ARENA_RULES.width / SUBUNITS_PER_UNIT;
+  const arena = MOVEMENT_SCENARIOS.find((s) => s.id === scenarioId)?.arena ?? DEFAULT_ARENA_RULES;
+  const width = arena.width / SUBUNITS_PER_UNIT;
 
   return (
     <section ref={rootRef} className="space-y-4">
@@ -213,6 +219,7 @@ export function MovementLab() {
         data-testid="movement-view"
         role="img"
         aria-label="Arena with both fighters' pushboxes and trajectories"
+        aria-describedby="movement-readouts"
         className="w-full max-w-[960px] rounded bg-neutral-900"
         viewBox={`0 ${-VIEW_HEIGHT} ${width} ${VIEW_HEIGHT + VIEW_BELOW}`}
       >
@@ -225,8 +232,8 @@ export function MovementLab() {
               data-trace={player}
               fill="none"
               stroke={COLORS[player]}
-              strokeOpacity={0.6}
-              strokeWidth={1}
+              strokeWidth={2}
+              strokeDasharray={DASHES[player]}
             />
             <rect
               data-box={player}
@@ -234,28 +241,54 @@ export function MovementLab() {
               fillOpacity={0.35}
               stroke={COLORS[player]}
               strokeWidth={1}
+              strokeDasharray={DASHES[player]}
             />
+            <text
+              data-label={player}
+              fill={COLORS[player]}
+              fontFamily="monospace"
+              fontSize={12}
+              textAnchor="middle"
+            >
+              P{player + 1}
+            </text>
           </g>
         ))}
       </svg>
-      <dl className="grid w-fit grid-cols-[auto_repeat(6,auto)] gap-x-4 font-mono text-xs text-neutral-400">
-        <dt />
-        {['x', 'y', 'vx', 'vy', 'facing', 'state'].map((label) => (
-          <dd key={label}>{label}</dd>
-        ))}
-        {PLAYERS.map((player) => (
-          <div key={player} className="contents">
-            <dt style={{ color: COLORS[player] }}>Player {player + 1}</dt>
-            {['x', 'y', 'vx', 'vy', 'facing', 'state'].map((field) => (
-              <dd
-                key={field}
-                data-testid={`movement-p${player + 1}-${field}`}
-                data-readout={`p${player}-${field}`}
-              />
+      <table id="movement-readouts" className="font-mono text-xs text-neutral-400">
+        <caption className="sr-only">Fighter readouts</caption>
+        <thead>
+          <tr>
+            <td />
+            {FIELDS.map((field) => (
+              <th key={field} scope="col" className="px-2 text-left font-normal">
+                {field}
+              </th>
             ))}
-          </div>
-        ))}
-      </dl>
+          </tr>
+        </thead>
+        <tbody>
+          {PLAYERS.map((player) => (
+            <tr key={player}>
+              <th
+                scope="row"
+                className="pr-2 text-left font-normal"
+                style={{ color: COLORS[player] }}
+              >
+                Player {player + 1}
+              </th>
+              {FIELDS.map((field) => (
+                <td
+                  key={field}
+                  className="px-2"
+                  data-testid={`movement-p${player + 1}-${field}`}
+                  data-readout={`p${player}-${field}`}
+                />
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
       <section aria-label="Movement events" className="w-fit min-w-64 font-mono text-xs">
         <h2 className="mb-1 text-sm text-neutral-400">Events (oldest first, last {LOG_KEPT})</h2>
         <ol ref={logRef} data-testid="movement-events" className="space-y-0.5" />
@@ -321,11 +354,18 @@ function stance(fighter: FighterState): string {
   return fighter.crouching ? 'crouching' : 'standing';
 }
 
-function drawBox(rect: SVGRectElement | null | undefined, fighter: FighterState) {
-  if (!rect) return;
+function drawBox(
+  rect: SVGRectElement | null | undefined,
+  label: SVGTextElement | null | undefined,
+  fighter: FighterState,
+) {
   const { width, height } = pushboxOf(fighter);
-  rect.setAttribute('x', String((fighter.x - width / 2) / SUBUNITS_PER_UNIT));
-  rect.setAttribute('y', String(-(fighter.y + height) / SUBUNITS_PER_UNIT));
-  rect.setAttribute('width', String(width / SUBUNITS_PER_UNIT));
-  rect.setAttribute('height', String(height / SUBUNITS_PER_UNIT));
+  const top = -(fighter.y + height) / SUBUNITS_PER_UNIT;
+  rect?.setAttribute('x', String((fighter.x - width / 2) / SUBUNITS_PER_UNIT));
+  rect?.setAttribute('y', String(top));
+  rect?.setAttribute('width', String(width / SUBUNITS_PER_UNIT));
+  rect?.setAttribute('height', String(height / SUBUNITS_PER_UNIT));
+  // The label sits just above the box and follows it.
+  label?.setAttribute('x', String(fighter.x / SUBUNITS_PER_UNIT));
+  label?.setAttribute('y', String(top - 4));
 }

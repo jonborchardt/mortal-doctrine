@@ -162,22 +162,23 @@ export function updateMovement(
   if (arena.maxSeparation !== undefined) {
     const l = drafts[0].x <= drafts[1].x ? 0 : 1;
     const r = l === 0 ? 1 : 0;
-    const L = drafts[l];
-    const R = drafts[r];
-    const excess = R.x - L.x - arena.maxSeparation;
+    const leftward = drafts[l];
+    const rightward = drafts[r];
+    const excess = rightward.x - leftward.x - arena.maxSeparation;
     if (excess > 0) {
-      const awayL = Math.max(0, slice[l].x - L.x);
-      const awayR = Math.max(0, R.x - slice[r].x);
+      const awayL = Math.max(0, slice[l].x - leftward.x);
+      const awayR = Math.max(0, rightward.x - slice[r].x);
+      // Ceiling, not truncation (spec rule 4): two shares cover an odd excess.
       const share = Math.ceil(excess / 2);
       let moveL = Math.min(awayL, share);
       let moveR = Math.min(awayR, share);
       const rest = excess - moveL - moveR;
       if (rest > 0 && awayL > awayR) moveL += Math.min(rest, awayL - moveL);
       if (rest > 0 && awayR > awayL) moveR += Math.min(rest, awayR - moveR);
-      L.x += moveL;
-      R.x -= moveR;
-      if (moveL > 0 && L.vx < 0) L.vx = 0;
-      if (moveR > 0 && R.vx > 0) R.vx = 0;
+      leftward.x += moveL;
+      rightward.x -= moveR;
+      if (moveL > 0 && leftward.vx < 0) leftward.vx = 0;
+      if (moveR > 0 && rightward.vx > 0) rightward.vx = 0;
     }
   }
 
@@ -188,10 +189,12 @@ export function updateMovement(
   const overlap = (boxA.width + boxB.width) / 2 - Math.abs(a.x - b.x);
   if (overlap > 0 && a.y < b.y + boxB.height && b.y < a.y + boxA.height) {
     // Left is by x, then start-of-tick x; on a full tie player 0 goes left.
-    const l = (a.x !== b.x ? a.x - b.x : slice[0].x - slice[1].x) > 0 ? 1 : 0;
+    const aIsRightOfB = a.x !== b.x ? a.x > b.x : slice[0].x > slice[1].x;
+    const l = aIsRightOfB ? 1 : 0;
     const r = l === 0 ? 1 : 0;
     const roomL = drafts[l].x - pushboxOf(drafts[l]).width / 2;
     const roomR = width - pushboxOf(drafts[r]).width / 2 - drafts[r].x;
+    // Ceiling, not truncation (spec rule 5): two pushes cover an odd overlap.
     const push = Math.ceil(overlap / 2);
     let moveL = Math.min(push, roomL);
     let moveR = Math.min(push, roomR);

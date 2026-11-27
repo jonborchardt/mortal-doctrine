@@ -31,6 +31,23 @@ test('movement lab is listed under Simulation and loads directly, paused at the 
   await expect(page.getByTestId('movement-p1-facing')).toHaveText('right');
   await expect(page.getByTestId('movement-p2-facing')).toHaveText('left');
   await expect(page.getByTestId('movement-p1-state')).toHaveText('standing');
+  // Readouts are a table with named rows and columns, and they describe the view.
+  const readouts = page.getByRole('table', { name: 'Fighter readouts' });
+  await expect(readouts.getByRole('rowheader')).toHaveText(['Player 1', 'Player 2']);
+  await expect(readouts.getByRole('columnheader')).toHaveText([
+    'x',
+    'y',
+    'vx',
+    'vy',
+    'facing',
+    'state',
+  ]);
+  await expect(page.getByTestId('movement-view')).toHaveAttribute(
+    'aria-describedby',
+    'movement-readouts',
+  );
+  // Player identity is not colour only: each box carries a text label.
+  await expect(page.getByTestId('movement-view').locator('text')).toHaveText(['P1', 'P2']);
 });
 
 test('neutral jump: apex on the expected frame, landing, parameter set, Reset', async ({
