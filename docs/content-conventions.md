@@ -38,8 +38,8 @@ Packages: `@mortal-doctrine/character-<id>` in `characters/<id>/`,
 | Facing           | `facing: 1` (right) or `-1` (left). All content is authored facing right; presentation and hit geometry mirror by `facing`.                                                                                                                                                        |
 | Character origin | Ground contact point, horizontally centered between the feet (bottom-center of the pushbox). **(implemented for placeholders)**                                                                                                                                                    |
 | Angles           | Degrees in authored content files; radians at runtime. Convert once in the loader. Positive = counter-clockwise in gameplay space (y-up). **(implemented in `@mortal-doctrine/math`)**                                                                                             |
-| Logical viewport | Default 960 × 540 (16:9) **(implemented, hard-coded today)**, scaled to the canvas host by CSS. A configurable default, not a constraint: never assume it equals the arena width.                                                                                                  |
-| Rendering scale  | Default: textures authored at 2× the logical resolution for high-DPI displays. Configurable per asset manifest once asset loading exists.                                                                                                                                          |
+| Logical viewport | Default 960 × 540 (16:9), configurable per renderer (`width`, `height`) **(implemented)**, scaled to the canvas host by CSS. A default, not a constraint: never assume it equals the arena width.                                                                                  |
+| Rendering scale  | Default: textures authored at 2× the logical resolution for high-DPI displays; loaded at resolution 2 so a 192 px file is 96 logical px. Configurable per manifest load (`loadTextureManifest(url, { resolution })`) **(implemented)**.                                            |
 | Gameplay time    | Integer frames at 60 Hz **(implemented)**. Move frame data (startup/active/recovery) is in frames.                                                                                                                                                                                 |
 | Animation time   | Keyframe times in integer frames at 60 Hz; presentation may interpolate between them and between ticks. Animation never drives gameplay timing.                                                                                                                                    |
 
@@ -60,6 +60,8 @@ expected.
 - Replacing art must not require engine changes.
 
 ## Asset manifests
+
+**(implemented: `loadTextureManifest` / `parseTextureManifest` in `@mortal-doctrine/renderer`)**
 
 Each content package keeps assets in `assets/` with an `assets/manifest.json`:
 

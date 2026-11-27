@@ -1,40 +1,81 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import {
   createInputCapture,
   DEFAULT_PLAYER_BINDINGS,
   type InputCapture,
 } from '@mortal-doctrine/input';
-import { createArenaRenderer } from '@mortal-doctrine/renderer';
+import { startHostLoop, type HostLoop } from '@mortal-doctrine/renderer';
 import { InputBit, TICK_RATE, type FrameInputs, type InputFrame } from '@mortal-doctrine/sim-core';
-import {
-  createSimulationRunner,
-  type InitialStateOptions,
-  type SimulationEvent,
-  type SimulationRunner,
-} from '@mortal-doctrine/simulation';
+import type { InitialStateOptions, SimulationEvent } from '@mortal-doctrine/simulation';
+import { createFixture, fixtureRecords, formatFixtureRecord } from './fixture-renderable';
 
 // Deterministic fixture the lab starts from and Reset returns to.
 const LAB_OPTIONS = { seed: 12345 } as const satisfies InitialStateOptions;
 const HISTORY_SHOWN = 16;
 const EVENTS_KEPT = 50;
+const VIEWPORTS = { '960x540': [960, 540], '640x360': [640, 360] } as const;
+type Viewport = keyof typeof VIEWPORTS;
+const FIXTURE_LAYERS = ['off', 'effects', 'background'] as const;
+type FixtureLayer = (typeof FIXTURE_LAYERS)[number];
+const GAMEPLAY_KEYS = new Set(
+  DEFAULT_PLAYER_BINDINGS.flatMap(({ keyboard }) => Object.values(keyboard ?? {}).flat()),
+);
+
+/**
+ * Input is always live here, so a focused select must not turn gameplay keys (arrows, letter
+ * type-ahead) into a value change. The key still reaches the window-level capture; Alt+Arrow, Tab,
+ * Enter, Space and the mouse still change the select.
+ */
+function keepGameplayKeys(event: KeyboardEvent<HTMLSelectElement>) {
+  if (!event.altKey && GAMEPLAY_KEYS.has(event.code)) event.preventDefault();
+}
 
 interface Session {
-  readonly runner: SimulationRunner;
+  readonly loop: HostLoop;
   readonly players: readonly [InputCapture, InputCapture];
   /** Recent events, oldest first (shown newest first). Mutated by the loop and controls, never React state. */
   readonly log: SimulationEvent[];
 }
 
-type Readout = 'frame' | 'state' | 'fps' | 'tps' | 'simMs' | 'frameMs' | 'rng' | 'p1' | 'p2';
+interface FixtureStatus {
+  /** `generation:layer:resolution` of the load this result belongs to. */
+  readonly key: string;
+  readonly size?: string;
+  readonly error?: string;
+}
+
+type Readout =
+  | 'frame'
+  | 'state'
+  | 'fps'
+  | 'tps'
+  | 'simMs'
+  | 'frameMs'
+  | 'rng'
+  | 'p1'
+  | 'p2'
+  | 'alpha'
+  | 'fixtures';
 
 export function SimulationLab() {
   const rootRef = useRef<HTMLElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const eventsRef = useRef<HTMLOListElement>(null);
   const sessionRef = useRef<Session | null>(null);
-  const [ready, setReady] = useState(false);
+  const interpolateRef = useRef(false);
+  // Increments each time a new loop is ready; the fixture effect re-registers on it.
+  const [loopGeneration, setLoopGeneration] = useState(0);
   const [paused, setPaused] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [viewport, setViewport] = useState<Viewport>('960x540');
+  const [interpolate, setInterpolate] = useState(false);
+  const [fixtureLayer, setFixtureLayer] = useState<FixtureLayer>('off');
+  const [resolution, setResolution] = useState(2);
+  // Result of the latest fixture load, keyed so a stale size or error is never shown.
+  const [fixtureStatus, setFixtureStatus] = useState<FixtureStatus>({ key: '' });
+  const ready = loopGeneration > 0;
+  const fixtureKey = `${loopGeneration}:${fixtureLayer}:${resolution}`;
+  const status = fixtureStatus.key === fixtureKey ? fixtureStatus : undefined;
 
   useEffect(() => {
     const host = hostRef.current;
@@ -42,76 +83,70 @@ export function SimulationLab() {
     const eventList = eventsRef.current;
     if (!host || !root || !eventList) return;
     let disposed = false;
-    let teardown = () => {};
+    const players = [
+      createInputCapture(DEFAULT_PLAYER_BINDINGS[0]),
+      createInputCapture(DEFAULT_PLAYER_BINDINGS[1]),
+    ] as const;
+    const readouts = new Map(
+      [...root.querySelectorAll<HTMLElement>('[data-readout]')].map((el) => [
+        el.dataset.readout,
+        el,
+      ]),
+    );
+    const write = (key: Readout, text: string) => setText(readouts.get(key), text);
 
-    createArenaRenderer(host)
-      .then((renderer) => {
-        if (disposed) return renderer.destroy();
-        const runner = createSimulationRunner(LAB_OPTIONS);
-        const players = [
-          createInputCapture(DEFAULT_PLAYER_BINDINGS[0]),
-          createInputCapture(DEFAULT_PLAYER_BINDINGS[1]),
-        ] as const;
-        const session: Session = { runner, players, log: [] };
-        sessionRef.current = session;
-        const readouts = new Map(
-          [...root.querySelectorAll<HTMLElement>('[data-readout]')].map((el) => [
-            el.dataset.readout,
-            el,
-          ]),
-        );
-        const write = (key: Readout, text: string) => setText(readouts.get(key), text);
+    // Measured tick rate over a rolling one-second window of display time.
+    let windowMs = 0;
+    let windowTicks = 0;
+    let shownLog = '';
+    const [width, height] = VIEWPORTS[viewport];
 
-        // Measured tick rate over a rolling one-second window of display time.
-        let windowMs = 0;
-        let windowTicks = 0;
-        let shownLog = '';
+    // Per-frame work stays outside React; React only handles control clicks.
+    const loop = startHostLoop(host, {
+      inputs: () => sample(players),
+      runner: LAB_OPTIONS,
+      renderer: { width, height },
+      interpolate: interpolateRef.current,
+      onFrame: ({ elapsedMs, ticks, events, simMs, state }) => {
+        record(session, events);
+        windowMs += elapsedMs;
+        windowTicks += ticks;
+        if (windowMs >= 1000) {
+          write('tps', String(Math.round((windowTicks * 1000) / windowMs)));
+          windowMs = 0;
+          windowTicks = 0;
+        }
+        write('frame', String(state.frame));
+        write('state', formatState(state));
+        write('rng', String(state.rng.state));
+        write('p1', formatHistory(state.input.history[0]));
+        write('p2', formatHistory(state.input.history[1]));
+        write('fps', Math.round(loop.renderer?.fps ?? 0).toString());
+        write('simMs', simMs.toFixed(3));
+        write('frameMs', (loop.renderer?.frameCpuMs ?? 0).toFixed(2));
+        write('alpha', loop.interpolate ? loop.runner.alpha.toFixed(3) : 'off');
+        write('fixtures', fixtureRecords.map(formatFixtureRecord).join('\n'));
 
-        // Per-frame work stays outside React; React only handles control clicks.
-        const unsubscribe = renderer.onFrame((elapsedMs) => {
-          const started = performance.now();
-          const { ticks, events } = runner.advance(elapsedMs, () => sample(players));
-          const simMs = performance.now() - started;
-          record(session, events);
-          renderer.render(runner.state);
-
-          windowMs += elapsedMs;
-          windowTicks += ticks;
-          if (windowMs >= 1000) {
-            write('tps', String(Math.round((windowTicks * 1000) / windowMs)));
-            windowMs = 0;
-            windowTicks = 0;
-          }
-          const { state } = runner;
-          write('frame', String(state.frame));
-          write('state', formatState(state));
-          write('rng', String(state.rng.state));
-          write('p1', formatHistory(state.input.history[0]));
-          write('p2', formatHistory(state.input.history[1]));
-          write('fps', Math.round(renderer.fps).toString());
-          write('simMs', simMs.toFixed(3));
-          write('frameMs', renderer.frameCpuMs.toFixed(2));
-
-          const logText = session.log.map(formatEvent).join('\n');
-          if (logText !== shownLog) {
-            shownLog = logText;
-            eventList.replaceChildren(
-              ...session.log.toReversed().map((event) => {
-                const item = document.createElement('li');
-                item.textContent = formatEvent(event);
-                return item;
-              }),
-            );
-          }
-        });
-
-        setReady(true);
-        teardown = () => {
-          unsubscribe();
-          for (const player of players) player.dispose();
-          renderer.destroy();
-          sessionRef.current = null;
-        };
+        const logText = session.log.map(formatEvent).join('\n');
+        if (logText !== shownLog) {
+          shownLog = logText;
+          eventList.replaceChildren(
+            ...session.log.toReversed().map((event) => {
+              const item = document.createElement('li');
+              item.textContent = formatEvent(event);
+              return item;
+            }),
+          );
+        }
+      },
+    });
+    const session: Session = { loop, players, log: [] };
+    sessionRef.current = session;
+    loop.ready
+      .then(() => {
+        if (disposed) return;
+        setPaused(loop.runner.paused);
+        setLoopGeneration((generation) => generation + 1);
       })
       .catch((cause: unknown) => {
         console.error(cause);
@@ -120,35 +155,64 @@ export function SimulationLab() {
 
     return () => {
       disposed = true;
-      teardown();
+      loop.destroy();
+      for (const player of players) player.dispose();
+      if (sessionRef.current === session) sessionRef.current = null;
     };
-  }, []);
+  }, [viewport]);
+
+  // Lab-local renderable, registered through the renderer's public API in the chosen layer.
+  useEffect(() => {
+    const renderer = sessionRef.current?.loop.renderer;
+    if (fixtureLayer === 'off' || !renderer) return;
+    const key = fixtureKey;
+    let cancelled = false;
+    let unregister = () => {};
+    createFixture(fixtureLayer, resolution).then(
+      (fixture) => {
+        if (cancelled) return fixture.renderable.destroy();
+        fixtureRecords.push(fixture.record);
+        unregister = renderer.register(fixture.renderable);
+        setFixtureStatus({ key, size: fixture.size });
+      },
+      (cause: unknown) => {
+        console.error(cause);
+        if (!cancelled) {
+          setFixtureStatus({ key, error: cause instanceof Error ? cause.message : String(cause) });
+        }
+      },
+    );
+    return () => {
+      cancelled = true;
+      unregister();
+    };
+  }, [fixtureKey, fixtureLayer, resolution]);
 
   // Event handlers only: refs must not be read during render.
   const control = (action: (session: Session) => void) => {
     const session = sessionRef.current;
     if (!session) return;
     action(session);
-    setPaused(session.runner.paused);
+    setPaused(session.loop.runner.paused);
   };
 
   const togglePause = () =>
-    control(({ runner }) => {
+    control(({ loop: { runner } }) => {
       if (runner.paused) runner.resume();
       else runner.pause();
     });
-  const stepFrame = () =>
-    control((session) =>
-      record(
-        session,
-        session.runner.stepOnce(() => sample(session.players)),
-      ),
-    );
+  const stepFrame = () => control((session) => record(session, session.loop.stepOnce()));
   const reset = () =>
-    control(({ runner, log }) => {
+    control(({ loop: { runner }, log }) => {
       runner.reset();
       log.length = 0;
     });
+  const toggleInterpolation = (checked: boolean) => {
+    interpolateRef.current = checked;
+    setInterpolate(checked);
+    const session = sessionRef.current;
+    if (session) session.loop.interpolate = checked;
+  };
 
   const buttonClass =
     'rounded bg-neutral-800 px-3 py-1 text-sm hover:bg-neutral-700 disabled:opacity-40';
@@ -177,6 +241,78 @@ export function SimulationLab() {
           Reset
         </button>
       </div>
+      <div className="flex flex-wrap items-center gap-4 text-sm">
+        <label className="flex items-center gap-2">
+          Viewport
+          <select
+            className="rounded bg-neutral-800 px-2 py-1"
+            value={viewport}
+            aria-describedby="viewport-hint"
+            onKeyDown={keepGameplayKeys}
+            onChange={(event) => setViewport(event.target.value as Viewport)}
+          >
+            {Object.keys(VIEWPORTS).map((key) => (
+              <option key={key} value={key}>
+                {key.replace('x', '×')}
+              </option>
+            ))}
+          </select>
+        </label>
+        <span id="viewport-hint" className="-ml-2 text-xs text-neutral-400">
+          (changing it restarts the simulation)
+        </span>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={interpolate}
+            onChange={(event) => toggleInterpolation(event.target.checked)}
+          />
+          Interpolation
+        </label>
+        <span className="font-mono text-xs text-neutral-400">
+          Alpha <span data-testid="render-alpha" data-readout="alpha" />
+        </span>
+        <label className="flex items-center gap-2">
+          Fixture renderable
+          <select
+            className="rounded bg-neutral-800 px-2 py-1"
+            value={fixtureLayer}
+            onKeyDown={keepGameplayKeys}
+            onChange={(event) => setFixtureLayer(event.target.value as FixtureLayer)}
+          >
+            {FIXTURE_LAYERS.map((layer) => (
+              <option key={layer} value={layer}>
+                {layer}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-2">
+          Texture resolution
+          <select
+            className="rounded bg-neutral-800 px-2 py-1"
+            value={resolution}
+            onKeyDown={keepGameplayKeys}
+            onChange={(event) => setResolution(Number(event.target.value))}
+          >
+            <option value={2}>2×</option>
+            <option value={1}>1×</option>
+          </select>
+        </label>
+        <span className="font-mono text-xs text-neutral-400">
+          Fixture size{' '}
+          <span data-testid="fixture-size">
+            {fixtureLayer === 'off'
+              ? 'off'
+              : (status?.size ?? (status?.error === undefined ? 'loading' : 'failed'))}
+          </span>
+        </span>
+      </div>
+      {fixtureLayer !== 'off' && status?.error !== undefined && (
+        <p role="alert" data-testid="fixture-error" className="text-red-400">
+          Fixture failed: {status.error}
+        </p>
+      )}
       <h2 id="sim-diagnostics" className="text-sm text-neutral-400">
         Diagnostics
       </h2>
@@ -198,6 +334,10 @@ export function SimulationLab() {
         <dd data-testid="sim-seed">{LAB_OPTIONS.seed}</dd>
         <dt>RNG state (no draws yet)</dt>
         <dd data-testid="sim-rng" data-readout="rng" />
+        <dt>Fixture renderables (this page)</dt>
+        <dd>
+          <pre data-testid="fixture-log" data-readout="fixtures" />
+        </dd>
       </dl>
       <h2 id="sim-input-history" className="text-sm text-neutral-400">
         Input history

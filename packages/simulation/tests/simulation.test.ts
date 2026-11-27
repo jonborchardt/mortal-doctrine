@@ -392,6 +392,41 @@ describe('simulation runner', () => {
   });
 });
 
+describe('runner alpha', () => {
+  it('is 0 initially, the accumulated fraction after a partial tick, and 0 while paused', () => {
+    const runner = createSimulationRunner();
+    expect(runner.alpha).toBe(0);
+    runner.advance(TICK_MS * 0.25, constant(IDLE));
+    expect(runner.alpha).toBeCloseTo(0.25, 9);
+    runner.advance(TICK_MS * 1.5, constant(IDLE));
+    expect(runner.state.frame).toBe(1);
+    expect(runner.alpha).toBeCloseTo(0.75, 9);
+    runner.pause();
+    expect(runner.alpha).toBe(0);
+    runner.advance(TICK_MS * 0.5, constant(IDLE));
+    expect(runner.alpha).toBe(0);
+    runner.resume();
+    runner.advance(TICK_MS * 0.5, constant(IDLE));
+    expect(runner.alpha).toBeCloseTo(0.5, 9);
+    runner.reset();
+    expect(runner.alpha).toBe(0);
+  });
+
+  it('stays in [0, 1) for arbitrary elapsed times and never changes the simulation', () => {
+    const withAlpha = createSimulationRunner(SEEDED_OPTIONS);
+    const without = createSimulationRunner(SEEDED_OPTIONS);
+    const provider = (frame: number): FrameInputs => [frame % 7 < 3 ? LEFT : RIGHT, 0];
+    for (let i = 0; i < 500; i++) {
+      const elapsed = ((i * 37) % 53) + (i % 3) * TICK_MS;
+      withAlpha.advance(elapsed, provider);
+      without.advance(elapsed, provider);
+      expect(withAlpha.alpha).toBeGreaterThanOrEqual(0);
+      expect(withAlpha.alpha).toBeLessThan(1);
+    }
+    expect(withAlpha.state).toEqual(without.state);
+  });
+});
+
 describe('commands', () => {
   const COMMAND_OPTIONS: InitialStateOptions = { seed: 7, commands: GENERIC_COMMANDS };
   const commandEvents = (events: readonly SimulationEvent[]) =>

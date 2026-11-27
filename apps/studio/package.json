@@ -23,6 +23,7 @@
     "@mortal-doctrine/rig": "workspace:*",
     "@mortal-doctrine/sim-core": "workspace:*",
     "@mortal-doctrine/simulation": "workspace:*",
+    "pixi.js": "^8.23.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
