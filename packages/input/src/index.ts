@@ -99,7 +99,9 @@ export interface InputSources {
 
 /** The real browser devices. */
 function browserInputSources(): InputSources {
-  return { window, document, getGamepads: () => navigator.getGamepads() };
+  // The Gamepad API is absent in insecure or policy-restricted contexts; keyboard play must go on.
+  const gamepads = navigator as { getGamepads?: Navigator['getGamepads'] };
+  return { window, document, getGamepads: () => gamepads.getGamepads?.() ?? [] };
 }
 
 /** Read-only view of raw device state for diagnostics (Input Lab). Reading it consumes nothing. */

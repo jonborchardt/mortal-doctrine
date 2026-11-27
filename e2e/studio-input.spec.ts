@@ -76,15 +76,15 @@ test('a keyboard tap between ticks lands in exactly one sampled frame', async ({
 
   await step.click();
   await expect(frames).toHaveText('RIGHT');
-  await expect(latched).toHaveText('·');
+  await expect(latched).toHaveText('neutral');
   await expect(taps).toHaveText(['tick 0: P1 RIGHT']);
 
   await step.click();
   await step.click();
   await expect(page.getByTestId('input-tick')).toHaveText('3');
-  await expect(frames).toHaveText('RIGHT · ·');
+  await expect(frames).toHaveText('RIGHT neutral neutral');
   await expect(taps).toHaveCount(1);
-  await expect(page.getByTestId('input-frames-p2')).toHaveText('· · ·');
+  await expect(page.getByTestId('input-frames-p2')).toHaveText('neutral neutral neutral');
 });
 
 test('a held key is sampled every tick and is not a tap', async ({ page }) => {
@@ -95,7 +95,7 @@ test('a held key is sampled every tick and is not a tap', async ({ page }) => {
   await step.click();
   await page.keyboard.up('KeyU');
   await step.click();
-  await expect(page.getByTestId('input-frames-p1')).toHaveText('A1 A1 ·');
+  await expect(page.getByTestId('input-frames-p1')).toHaveText('A1 A1 neutral');
   await expect(page.getByTestId('input-taps').getByRole('listitem')).toHaveCount(0);
 });
 
@@ -117,16 +117,16 @@ test('a stubbed gamepad drives only its assigned player', async ({ page }) => {
   await setGamepads(page, [{ axes: [0.3, -0.3] }]); // inside the deadzone
   await expect(raw2).toContainText('stick 0.30 / -0.30');
   await step.click();
-  await expect(p2).toHaveText('LEFT+A4 RIGHT+UP ·');
-  await expect(p1).toHaveText('· · ·');
+  await expect(p2).toHaveText('LEFT+A4 RIGHT+UP neutral');
+  await expect(p1).toHaveText('neutral neutral neutral');
 
   // Gamepad 1 is player one's.
   await setGamepads(page, [null, { buttons: [2, 15] }]);
   await expect(raw2).toContainText('gamepad 0: not connected');
   await expect(page.getByTestId('input-raw-p1')).toContainText('gamepad 1: buttons 2, 15');
   await step.click();
-  await expect(p1).toHaveText('· · · RIGHT+A1');
-  await expect(p2).toHaveText('LEFT+A4 RIGHT+UP · ·');
+  await expect(p1).toHaveText('neutral neutral neutral RIGHT+A1');
+  await expect(p2).toHaveText('LEFT+A4 RIGHT+UP neutral neutral');
 });
 
 test('both players are active at once without crosstalk', async ({ page }, testInfo) => {

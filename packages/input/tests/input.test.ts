@@ -1,5 +1,5 @@
 import { InputBit, inputFrameSchema, NEUTRAL_INPUT } from '@mortal-doctrine/sim-core';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createInputCapture,
   DEFAULT_GAMEPAD_BINDINGS,
@@ -366,5 +366,21 @@ describe('dispose', () => {
     io.down('KeyD');
     expect(first.sample()).toBe(NEUTRAL_INPUT);
     expect(second.sample()).toBe(RIGHT);
+  });
+});
+
+describe('default browser sources', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('keeps the keyboard working where the Gamepad API is absent', () => {
+    const window = new EventTarget();
+    vi.stubGlobal('window', window);
+    vi.stubGlobal('document', Object.assign(new EventTarget(), { visibilityState: 'visible' }));
+    vi.stubGlobal('navigator', {});
+    const capture = createInputCapture(P1);
+    window.dispatchEvent(Object.assign(new Event('keydown'), { code: 'KeyD' }));
+    expect(capture.sample()).toBe(RIGHT);
+    expect(capture.inspect().gamepad).toBeNull();
+    capture.dispose();
   });
 });

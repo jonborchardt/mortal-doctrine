@@ -139,14 +139,11 @@ export function InputLab() {
         </button>
       </div>
       {PLAYERS.map((player) => (
-        <section key={player} className="space-y-1">
+        <section key={player} aria-labelledby={`input-p${player + 1}`} className="space-y-1">
           <h2 id={`input-p${player + 1}`} className="text-sm text-neutral-400">
             Player {player + 1}
           </h2>
-          <dl
-            aria-labelledby={`input-p${player + 1}`}
-            className="grid w-fit grid-cols-[auto_auto] gap-x-4 font-mono text-xs text-neutral-400"
-          >
+          <dl className="grid w-fit grid-cols-[auto_auto] gap-x-4 font-mono text-xs text-neutral-400">
             <dt>Raw device state</dt>
             <dd data-testid={`input-raw-p${player + 1}`} data-readout={`raw-${player}`} />
             <dt>Latched for the next tick</dt>
@@ -188,11 +185,11 @@ function sampleTick(session: Session, tick: number): FrameInputs {
 
 const BITS = Object.entries(InputBit);
 
-/** Bit names joined by `+` (opposing directions shown as recorded); `·` is neutral. */
+/** Bit names joined by `+` (opposing directions shown as recorded); no bit is `neutral`. */
 function formatFrame(frame: InputFrame): string {
   return (
     BITS.filter(([, bit]) => frame & bit)
       .map(([name]) => name)
-      .join('+') || '·'
+      .join('+') || 'neutral'
   );
 }

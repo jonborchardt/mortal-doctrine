@@ -68,7 +68,7 @@ export function App() {
         </span>
       </div>
       <div ref={hostRef} data-testid="arena" className="w-full max-w-[960px]" />
-      <p className="text-sm text-neutral-500">
+      <p className="text-sm text-neutral-400">
         Player 1: ← → or A / D · Player 2: numpad 4 / 6 or the first gamepad
       </p>
       {error && <p className="text-red-400">Renderer failed: {error}</p>}
