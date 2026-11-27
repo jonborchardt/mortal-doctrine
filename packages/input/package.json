@@ -1,0 +1,22 @@
+{
+  "name": "@mortal-doctrine/input",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "mortalDoctrine": {
+    "layer": "presentation"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mortal-doctrine/simulation": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^5.1.2"
+  }
+}

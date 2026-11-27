@@ -1,0 +1,21 @@
+{
+  "verification": {
+    "commands": [
+      {
+        "id": "install",
+        "command": "pnpm",
+        "args": ["install", "--frozen-lockfile"]
+      },
+      {
+        "id": "check",
+        "command": "pnpm",
+        "args": ["check"]
+      },
+      {
+        "id": "test-e2e",
+        "command": "pnpm",
+        "args": ["test:e2e"]
+      }
+    ]
+  }
+}

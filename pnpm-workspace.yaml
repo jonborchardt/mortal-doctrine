@@ -1,0 +1,9 @@
+packages:
+  - apps/*
+  - packages/*
+  - characters/*
+  - arenas/*
+permissions:
+  pixi.js:
+    skills: false
+engineStrict: true

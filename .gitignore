@@ -1,0 +1,14 @@
+node_modules/
+dist/
+*.tsbuildinfo
+test-results/
+coverage/
+playwright-report/
+blob-report/
+.vite/
+*.log
+.DS_Store
+.env
+.env.*
+.playwright-mcp/
+.claude/settings.local.json

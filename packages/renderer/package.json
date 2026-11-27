@@ -1,0 +1,19 @@
+{
+  "name": "@mortal-doctrine/renderer",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "mortalDoctrine": {
+    "layer": "presentation"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "@mortal-doctrine/simulation": "workspace:*",
+    "pixi.js": "^8.23.0"
+  }
+}

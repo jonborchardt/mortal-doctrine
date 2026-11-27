@@ -1,0 +1,11 @@
+{
+  // Root project: tooling config, scripts and end-to-end tests.
+  // Workspace packages and apps each have their own tsconfig.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    // scripts/ runs directly under Node's type stripping.
+    "erasableSyntaxOnly": true
+  },
+  "include": ["*.ts", "scripts", "e2e"]
+}

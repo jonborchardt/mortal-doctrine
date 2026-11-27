@@ -1,0 +1,50 @@
+import { createServer } from 'node:net';
+import { defineConfig, devices } from '@playwright/test';
+
+// Worktree isolation: every run starts its own dev servers on free ports and never reuses an
+// existing server, so parallel checkouts cannot test each other's code. Ports are chosen once
+// in the runner process and inherited by workers (which re-evaluate this file) via env.
+async function freePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = createServer();
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      server.close(() =>
+        typeof address === 'object' && address ? resolve(address.port) : reject(new Error()),
+      );
+    });
+  });
+}
+
+process.env.MD_E2E_GAME_PORT ??= String(await freePort());
+process.env.MD_E2E_STUDIO_PORT ??= String(await freePort());
+
+const apps = [
+  { name: 'game', port: process.env.MD_E2E_GAME_PORT },
+  { name: 'studio', port: process.env.MD_E2E_STUDIO_PORT },
+];
+const isCI = Boolean(process.env.CI);
+
+export default defineConfig({
+  testDir: 'e2e',
+  outputDir: 'test-results',
+  forbidOnly: isCI,
+  reporter: isCI ? [['github'], ['html', { open: 'never' }]] : 'list',
+  use: { trace: 'retain-on-failure', screenshot: 'only-on-failure' },
+  projects: apps.map(({ name, port }) => ({
+    name,
+    testMatch: `${name}*.spec.ts`,
+    use: {
+      ...devices['Desktop Chrome'],
+      baseURL: `http://127.0.0.1:${port}`,
+      // GPU-less CI runners need SwiftShader for WebGL, which PixiJS requires.
+      launchOptions: { args: ['--enable-unsafe-swiftshader'] },
+    },
+  })),
+  webServer: apps.map(({ name, port }) => ({
+    command: `pnpm --filter @mortal-doctrine/${name} exec vite --host 127.0.0.1 --port ${port} --strictPort`,
+    url: `http://127.0.0.1:${port}`,
+    reuseExistingServer: false,
+  })),
+});
