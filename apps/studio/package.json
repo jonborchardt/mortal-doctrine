@@ -16,6 +16,7 @@
   "dependencies": {
     "@mortal-doctrine/animation": "workspace:*",
     "@mortal-doctrine/audio": "workspace:*",
+    "@mortal-doctrine/camera": "workspace:*",
     "@mortal-doctrine/commands": "workspace:*",
     "@mortal-doctrine/input": "workspace:*",
     "@mortal-doctrine/math": "workspace:*",
