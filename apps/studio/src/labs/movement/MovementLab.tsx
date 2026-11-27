@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { pushboxOf, type FighterState } from '@mortal-doctrine/movement';
+import { DEFAULT_ARENA_RULES, pushboxOf, type FighterState } from '@mortal-doctrine/movement';
 import {
   MOVEMENT_SCENARIOS,
   PARAMETER_SETS,
@@ -45,7 +45,6 @@ export function MovementLab() {
   const [paused, setPaused] = useState(true);
   const [scenarioId, setScenarioId] = useState(DEFAULT_SCENARIO.id);
   const [setId, setSetId] = useState(DEFAULT_SET.id);
-  const [arenaWidth, setArenaWidth] = useState(96_000);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -129,7 +128,6 @@ export function MovementLab() {
     setPaused(session.runner.paused);
     setScenarioId(session.scenario.id);
     setSetId(session.set.id);
-    setArenaWidth(session.runner.state.arena.width);
   };
   const togglePause = () =>
     control(({ runner }) => {
@@ -159,7 +157,7 @@ export function MovementLab() {
   const buttonClass =
     'rounded bg-neutral-800 px-3 py-1 text-sm hover:bg-neutral-700 disabled:opacity-40';
   const selectClass = 'rounded bg-neutral-800 px-2 py-1 text-sm text-neutral-100';
-  const width = arenaWidth / SUBUNITS_PER_UNIT;
+  const width = DEFAULT_ARENA_RULES.width / SUBUNITS_PER_UNIT;
 
   return (
     <section ref={rootRef} className="space-y-4">

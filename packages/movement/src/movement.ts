@@ -149,7 +149,6 @@ export function updateMovement(
   const { width } = arena;
   const integrated = [integrate(slice[0], inputs[0]), integrate(slice[1], inputs[1])] as const;
   const drafts = [integrated[0].f, integrated[1].f] as const;
-  const half = (player: 0 | 1) => pushboxOf(drafts[player]).width / 2;
 
   // Rule 3: wall clamp. Rule 6: velocity into the wall that corrected x is dropped.
   for (const f of drafts) {
@@ -191,8 +190,8 @@ export function updateMovement(
     // Left is by x, then start-of-tick x; on a full tie player 0 goes left.
     const l = (a.x !== b.x ? a.x - b.x : slice[0].x - slice[1].x) > 0 ? 1 : 0;
     const r = l === 0 ? 1 : 0;
-    const roomL = drafts[l].x - half(l);
-    const roomR = width - half(r) - drafts[r].x;
+    const roomL = drafts[l].x - pushboxOf(drafts[l]).width / 2;
+    const roomR = width - pushboxOf(drafts[r]).width / 2 - drafts[r].x;
     const push = Math.ceil(overlap / 2);
     let moveL = Math.min(push, roomL);
     let moveR = Math.min(push, roomR);
