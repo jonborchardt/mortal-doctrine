@@ -14,6 +14,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@mortal-doctrine/animation": "workspace:*",
     "@mortal-doctrine/input": "workspace:*",
     "@mortal-doctrine/math": "workspace:*",
     "@mortal-doctrine/renderer": "workspace:*",
