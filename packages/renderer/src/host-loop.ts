@@ -68,9 +68,10 @@ export function startHostLoop(host: HTMLElement, options: HostLoopOptions): Host
         const frameEvents = pending.length ? [...pending, ...events] : events;
         pending = [];
         const { state } = runner;
+        // Paused, alpha stays 0: blending would draw the snapshot one tick behind the frame shown.
         created.render(
           state,
-          loop.interpolate
+          loop.interpolate && !runner.paused
             ? { previous, alpha: runner.alpha, events: frameEvents }
             : { events: frameEvents },
         );

@@ -80,6 +80,12 @@ describe('parseTextureManifest', () => {
 
   it.each([
     ['a .. segment', 'textures/../secret@2x.png', /textures\.hero: must not contain "\.\."/],
+    ['an encoded .. segment', 'textures/%2E%2e/secret@2x.png', /textures\.hero: must not contain/],
+    [
+      'a half-encoded .. segment',
+      'textures/.%2e/secret@2x.png',
+      /textures\.hero: must not contain/,
+    ],
     ['a backslash', 'textures\\hero@2x.png', /textures\.hero: must use forward slashes/],
     ['an absolute path', '/textures/hero@2x.png', /textures\.hero: must be relative/],
     ['an absolute URL', 'https://cdn.test/hero@2x.png', /textures\.hero: must be relative/],

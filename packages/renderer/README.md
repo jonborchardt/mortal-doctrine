@@ -23,6 +23,8 @@ skeletal drawing, effects, arena art and HUD belong to later packages, which reg
 | `layers`       | `['background', 'fighters', 'effects', 'overlay']` | Layer names, **bottom first**: later layers draw over earlier ones           |
 | `placeholders` | `true`                                             | Registers the placeholder floor (`background`) and fighters (`fighters`)     |
 
+A layer name listed twice is one layer, at its first position.
+
 The canvas backing store is always 1× (no device-pixel-ratio handling); the viewport is fixed
 at creation (recreate the renderer to change it).
 
@@ -45,7 +47,8 @@ interface Renderable {
 // RenderFrame = { state, previous, alpha, events, view }
 ```
 
-`renderer.register(renderable)` returns an idempotent unregister. Layers are plain logical-pixel
+`renderer.register(renderable)` returns an idempotent unregister. Registering on a destroyed
+renderer (e.g. after an async texture load outlived it) destroys the renderable at once. Layers are plain logical-pixel
 containers; a renderable applies `frame.view` itself (position with `worldToScreen`, scale by
 `view.scale`), so textures are never flipped. `renderer.render(state, { previous, alpha, events })`
 updates every renderable (`render(state)` alone is still valid). `events` are the simulation
@@ -64,15 +67,17 @@ placeholder fighters use it; nothing else is interpolated.
 `{ textures, urls, release }` keyed by texture id; `release()` unloads them from Pixi's asset
 cache and destroys them. A failed texture rejects with its id and URL, after releasing the rest.
 `parseTextureManifest(json, manifestUrl)` is the Pixi-free validator (relative paths, forward
-slashes, no `..`, unknown versions rejected; errors name the field or texture id) returning
-id → absolute URL. One live load per URL at a time: loads wait for that URL's pending release.
+slashes, no `..` segment, plain or percent-encoded, unknown versions rejected; errors name the field or texture id) returning
+id → absolute URL. One live load per URL at a time: Pixi caches one texture per URL with no reference count, so
+the first `release()` destroys it for every holder. Give each URL a single owner; a new load
+waits for that URL's pending release.
 
 ## Host loop
 
 `startHostLoop(host, { inputs, onFrame?, renderer?, runner?, interpolate? })` owns a renderer,
 a `SimulationRunner` and the display-frame subscription. Each display frame it advances the
 runner (calling `inputs` once per tick), renders (with `previous` and `runner.alpha` when
-`interpolate` is on), then calls `onFrame({ elapsedMs, ticks, events, simMs, state })`. The
+`interpolate` is on and the runner is not paused; paused frames draw the current snapshot), then calls `onFrame({ elapsedMs, ticks, events, simMs, state })`. The
 handle exposes `ready`, `runner`, `renderer` (undefined until ready), a writable `interpolate`,
 `stepOnce()` (its events also reach renderables on the next drawn frame) and `destroy()`, which
 is safe before `ready` resolves (React StrictMode) and when repeated.

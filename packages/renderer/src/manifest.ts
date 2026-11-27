@@ -8,7 +8,11 @@ const texturePath = z
     (path) => !path.startsWith('/') && !/^[a-z][a-z\d+.-]*:/i.test(path),
     'must be relative to the manifest',
   )
-  .refine((path) => !path.split('/').includes('..'), 'must not contain ".."');
+  // URL resolution treats `%2e` as `.`, so percent-encoded dot segments are parents too.
+  .refine(
+    (path) => !path.split('/').some((segment) => /^(?:\.|%2e){2}$/i.test(segment)),
+    'must not contain ".."',
+  );
 
 const textureManifestSchema = z.strictObject({
   schemaVersion: z.literal(1),

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import {
   createInputCapture,
   DEFAULT_PLAYER_BINDINGS,
@@ -17,12 +17,31 @@ const VIEWPORTS = { '960x540': [960, 540], '640x360': [640, 360] } as const;
 type Viewport = keyof typeof VIEWPORTS;
 const FIXTURE_LAYERS = ['off', 'effects', 'background'] as const;
 type FixtureLayer = (typeof FIXTURE_LAYERS)[number];
+const GAMEPLAY_KEYS = new Set(
+  DEFAULT_PLAYER_BINDINGS.flatMap(({ keyboard }) => Object.values(keyboard ?? {}).flat()),
+);
+
+/**
+ * Input is always live here, so a focused select must not turn gameplay keys (arrows, letter
+ * type-ahead) into a value change. The key still reaches the window-level capture; Alt+Arrow, Tab,
+ * Enter, Space and the mouse still change the select.
+ */
+function keepGameplayKeys(event: KeyboardEvent<HTMLSelectElement>) {
+  if (!event.altKey && GAMEPLAY_KEYS.has(event.code)) event.preventDefault();
+}
 
 interface Session {
   readonly loop: HostLoop;
   readonly players: readonly [InputCapture, InputCapture];
   /** Recent events, oldest first (shown newest first). Mutated by the loop and controls, never React state. */
   readonly log: SimulationEvent[];
+}
+
+interface FixtureStatus {
+  /** `generation:layer:resolution` of the load this result belongs to. */
+  readonly key: string;
+  readonly size?: string;
+  readonly error?: string;
 }
 
 type Readout =
@@ -52,9 +71,11 @@ export function SimulationLab() {
   const [interpolate, setInterpolate] = useState(false);
   const [fixtureLayer, setFixtureLayer] = useState<FixtureLayer>('off');
   const [resolution, setResolution] = useState(2);
-  const [fixtureSize, setFixtureSize] = useState<string | null>(null);
-  const [fixtureError, setFixtureError] = useState<string | null>(null);
+  // Result of the latest fixture load, keyed so a stale size or error is never shown.
+  const [fixtureStatus, setFixtureStatus] = useState<FixtureStatus>({ key: '' });
   const ready = loopGeneration > 0;
+  const fixtureKey = `${loopGeneration}:${fixtureLayer}:${resolution}`;
+  const status = fixtureStatus.key === fixtureKey ? fixtureStatus : undefined;
 
   useEffect(() => {
     const host = hostRef.current;
@@ -144,6 +165,7 @@ export function SimulationLab() {
   useEffect(() => {
     const renderer = sessionRef.current?.loop.renderer;
     if (fixtureLayer === 'off' || !renderer) return;
+    const key = `${loopGeneration}:${fixtureLayer}:${resolution}`;
     let cancelled = false;
     let unregister = () => {};
     createFixture(fixtureLayer, resolution).then(
@@ -151,12 +173,13 @@ export function SimulationLab() {
         if (cancelled) return fixture.renderable.destroy();
         fixtureRecords.push(fixture.record);
         unregister = renderer.register(fixture.renderable);
-        setFixtureSize(fixture.size);
-        setFixtureError(null);
+        setFixtureStatus({ key, size: fixture.size });
       },
       (cause: unknown) => {
         console.error(cause);
-        if (!cancelled) setFixtureError(cause instanceof Error ? cause.message : String(cause));
+        if (!cancelled) {
+          setFixtureStatus({ key, error: cause instanceof Error ? cause.message : String(cause) });
+        }
       },
     );
     return () => {
@@ -224,6 +247,8 @@ export function SimulationLab() {
           <select
             className="rounded bg-neutral-800 px-2 py-1"
             value={viewport}
+            aria-describedby="viewport-hint"
+            onKeyDown={keepGameplayKeys}
             onChange={(event) => setViewport(event.target.value as Viewport)}
           >
             {Object.keys(VIEWPORTS).map((key) => (
@@ -233,6 +258,9 @@ export function SimulationLab() {
             ))}
           </select>
         </label>
+        <span id="viewport-hint" className="-ml-2 text-xs text-neutral-400">
+          (changing it restarts the simulation)
+        </span>
         <label className="flex items-center gap-2">
           <input
             type="checkbox"
@@ -249,6 +277,7 @@ export function SimulationLab() {
           <select
             className="rounded bg-neutral-800 px-2 py-1"
             value={fixtureLayer}
+            onKeyDown={keepGameplayKeys}
             onChange={(event) => setFixtureLayer(event.target.value as FixtureLayer)}
           >
             {FIXTURE_LAYERS.map((layer) => (
@@ -263,6 +292,7 @@ export function SimulationLab() {
           <select
             className="rounded bg-neutral-800 px-2 py-1"
             value={resolution}
+            onKeyDown={keepGameplayKeys}
             onChange={(event) => setResolution(Number(event.target.value))}
           >
             <option value={2}>2×</option>
@@ -272,13 +302,15 @@ export function SimulationLab() {
         <span className="font-mono text-xs text-neutral-400">
           Fixture size{' '}
           <span data-testid="fixture-size">
-            {fixtureLayer === 'off' ? 'off' : (fixtureSize ?? 'loading')}
+            {fixtureLayer === 'off'
+              ? 'off'
+              : (status?.size ?? (status?.error === undefined ? 'loading' : 'failed'))}
           </span>
         </span>
       </div>
-      {fixtureLayer !== 'off' && fixtureError && (
+      {fixtureLayer !== 'off' && status?.error !== undefined && (
         <p role="alert" data-testid="fixture-error" className="text-red-400">
-          Fixture failed: {fixtureError}
+          Fixture failed: {status.error}
         </p>
       )}
       <h2 id="sim-diagnostics" className="text-sm text-neutral-400">

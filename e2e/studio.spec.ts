@@ -321,6 +321,7 @@ test('a texture that fails to load reports its id and URL without leaking a canv
   const error = page.getByTestId('fixture-error');
   await expect(error).toContainText('fixture-block');
   await expect(error).toContainText('/fixtures/renderer/textures/fixture-block@2x.png');
+  await expect(page.getByTestId('fixture-size')).toHaveText('failed');
   await expect(arenaCanvas(page)).toHaveCount(1);
 });
 
@@ -363,6 +364,26 @@ test('destroying a loop tears down its registered renderable and releases its te
   await expect.poll(() => readFrame(frame)).toBeGreaterThan(start + 30);
   expect(await fixtureById(page, old.id)).toEqual(frozen);
   expect((await latestFixture(page))?.updates).toBeGreaterThan(0);
+});
+
+test('gameplay arrow keys on a focused lab select change neither the select nor the viewport', async ({
+  page,
+}) => {
+  await page.goto(SIMULATION_LAB);
+  const paused = await pausedAt(page);
+  for (const [label, value] of [
+    ['Viewport', '960x540'],
+    ['Fixture renderable', 'off'],
+    ['Texture resolution', '2'],
+  ] as const) {
+    const select = page.getByLabel(label);
+    await select.focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(select).toHaveValue(value);
+  }
+  await expect(arenaCanvas(page)).toHaveAttribute('width', '960');
+  await expect(page.getByTestId('sim-frame')).toHaveText(String(paused));
+  await expect(page.getByRole('button', { name: 'Resume' })).toBeVisible();
 });
 
 test('the interpolation checkbox switches the alpha readout', async ({ page }) => {

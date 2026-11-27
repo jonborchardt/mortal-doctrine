@@ -106,6 +106,7 @@ export async function createArenaRenderer(
 
   let view = defaultView(width, height);
   const mounted = new Set<Renderable>();
+  let destroyed = false;
   const unmount = (renderable: Renderable) => {
     if (!mounted.delete(renderable)) return;
     renderable.container.removeFromParent();
@@ -127,6 +128,11 @@ export async function createArenaRenderer(
       view = next;
     },
     register(renderable) {
+      // A late registration (e.g. after an async texture load) must not leak what it owns.
+      if (destroyed) {
+        renderable.destroy();
+        return () => {};
+      }
       const layer = layerContainers.get(renderable.layer);
       if (!layer) throw unknownLayer(renderable.layer);
       layer.addChild(renderable.container);
@@ -145,6 +151,7 @@ export async function createArenaRenderer(
       return frameCpuMs;
     },
     destroy() {
+      destroyed = true;
       for (const renderable of [...mounted]) unmount(renderable);
       app.destroy({ removeView: true }, { children: true });
     },

@@ -41,31 +41,41 @@ export async function loadTextureManifest(
   const urls = parseTextureManifest(await response.json(), absolute);
   const entries = Object.entries(urls);
 
-  const loaded = await Promise.allSettled(
+  const loaded = await Promise.all(
     entries.map(async ([id, url]) => {
-      await releasing.get(url);
       try {
-        return await Assets.load<Texture>({ alias: url, src: url, data: { resolution } });
+        await releasing.get(url);
+        return {
+          url,
+          id,
+          texture: await Assets.load<Texture>({ alias: url, src: url, data: { resolution } }),
+        };
       } catch (cause) {
         // Nothing was cached; forget the alias so a retry honours its own resolution.
         Assets.resolver.removeAlias(url);
-        throw new Error(`Texture "${id}" failed to load from ${url}: ${String(cause)}`, { cause });
+        const error = new Error(`Texture "${id}" failed to load from ${url}: ${String(cause)}`, {
+          cause,
+        });
+        return { url, id, error };
       }
     }),
   );
   const textures: Record<string, Texture> = {};
+  const loadedUrls: string[] = [];
   let failure: Error | undefined;
-  loaded.forEach((result, index) => {
-    const [id = ''] = entries[index] ?? [];
-    if (result.status === 'fulfilled') textures[id] = result.value;
-    else
-      failure ??= result.reason instanceof Error ? result.reason : new Error(String(result.reason));
-  });
+  for (const result of loaded) {
+    if ('texture' in result) {
+      textures[result.id] = result.texture;
+      loadedUrls.push(result.url);
+    } else {
+      failure ??= result.error;
+    }
+  }
   let released = false;
   const release = async () => {
     if (released) return;
     released = true;
-    await Promise.all(Object.keys(textures).map((id) => unload(urls[id] ?? '')));
+    await Promise.all(loadedUrls.map(unload));
   };
   if (failure !== undefined) {
     await release();
