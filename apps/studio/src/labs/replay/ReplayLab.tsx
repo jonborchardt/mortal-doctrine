@@ -31,19 +31,19 @@ interface View {
 
 const IDLE: View = { mode: 'idle', length: 0 };
 
-/** Control actions, created with the session inside the effect. Each returns the new view. */
+/** Control actions, created with the session inside the effect. */
 interface Actions {
-  record(): View;
-  stop(): View;
-  play(): View;
-  pause(): View;
-  step(): View;
-  seek(frame: number): View;
-  exportJson(): View;
+  record(): void;
+  stop(): void;
+  play(): void;
+  pause(): void;
+  step(): void;
+  seek(frame: number): void;
+  exportJson(): void;
   /** Throws, leaving the current replay in place, when the text is not a valid replay. */
-  importJson(): View;
-  reset(): View;
-  /** The view as it is now, for after an action that threw. */
+  importJson(): void;
+  reset(): void;
+  /** The view after an action, whether it succeeded or threw. */
   view(): View;
 }
 
@@ -109,7 +109,6 @@ export function ReplayLab() {
             replay = null;
             player = null;
             recording = { runner, recorder, provider };
-            return current();
           },
           stop() {
             // Show the recorded final frame; Play starts over from frame 0.
@@ -121,25 +120,20 @@ export function ReplayLab() {
               const recorded = load(recorder.finish());
               recorded.seek(recorded.length);
             }
-            return current();
           },
           play() {
             if (player && player.frame === player.length && !player.desync) player.seek(0);
             player?.play();
-            return current();
           },
           pause() {
             player?.pause();
-            return current();
           },
           step() {
             player?.pause();
             player?.stepOnce();
-            return current();
           },
           seek(frame) {
             player?.seek(frame);
-            return current();
           },
           exportJson() {
             if (replay) {
@@ -148,17 +142,14 @@ export function ReplayLab() {
               json.focus();
               json.select();
             }
-            return current();
           },
           importJson() {
             load(deserializeReplay(json.value));
-            return current();
           },
           reset() {
             recording = null;
             replay = null;
             player = null;
-            return current();
           },
           view: current,
         };
@@ -222,14 +213,15 @@ export function ReplayLab() {
 
   // Event handlers only: refs must not be read during render.
   // Every control clears the alert, so a failure message never outlives the next action.
-  const run = (name: string, action: (actions: Actions) => View) => () => {
+  const run = (name: string, action: (actions: Actions) => void) => () => {
     const actions = actionsRef.current;
     if (!actions) return;
     setAlert(null);
     try {
-      setView(action(actions));
+      action(actions);
     } catch (cause) {
       setAlert(`${name} failed: ${cause instanceof Error ? cause.message : String(cause)}`);
+    } finally {
       setView(actions.view());
     }
   };
@@ -238,7 +230,7 @@ export function ReplayLab() {
   const playback = mode === 'playback';
   const buttonClass =
     'rounded bg-neutral-800 px-3 py-1 text-sm hover:bg-neutral-700 disabled:opacity-40';
-  const button = (name: string, enabled: boolean, action: (actions: Actions) => View) => (
+  const button = (name: string, enabled: boolean, action: (actions: Actions) => void) => (
     <button
       type="button"
       className={buttonClass}
