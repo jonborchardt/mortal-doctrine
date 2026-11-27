@@ -1,0 +1,27 @@
+{
+  "name": "@mortal-doctrine/skeleton-renderer",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "mortalDoctrine": {
+    "layer": "presentation"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mortal-doctrine/animation": "workspace:*",
+    "@mortal-doctrine/math": "workspace:*",
+    "@mortal-doctrine/renderer": "workspace:*",
+    "@mortal-doctrine/rig": "workspace:*",
+    "pixi.js": "^8.23.0"
+  },
+  "devDependencies": {
+    "@mortal-doctrine/simulation": "workspace:*",
+    "vitest": "^5.1.2"
+  }
+}

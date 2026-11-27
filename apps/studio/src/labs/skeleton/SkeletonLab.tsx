@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { apply, degToRad, radToDeg } from '@mortal-doctrine/math';
 import { evaluate, extendRig, loadRig, type Pose, type Rig } from '@mortal-doctrine/rig';
 import { MANNEQUIN_RIG, NON_HUMANOID_RIG, TAIL_EXTENSION } from '@mortal-doctrine/rig/testing';
+import type { Facing } from '@mortal-doctrine/skeleton-renderer';
+import { SkeletonCanvas } from './SkeletonCanvas';
 
 const FIXTURES = [
   { id: 'mannequin', name: 'Mannequin', rig: loadRig(MANNEQUIN_RIG) },
@@ -50,11 +52,13 @@ export function SkeletonLab() {
   // fixture changes clear both, which is the fixture's rest pose.
   const [degrees, setDegrees] = useState<Readonly<Record<string, number>>>({});
   const [attachments, setAttachments] = useState<Readonly<Record<string, string | null>>>({});
+  const [facing, setFacing] = useState<Facing>(1);
 
   const { rig } = FIXTURES.find((fixture) => fixture.id === fixtureId) ?? FIXTURES[0];
   const reset = () => {
     setDegrees({});
     setAttachments({});
+    setFacing(1);
   };
   // Degrees stop here: the pose is in radians.
   const pose: Pose = {
@@ -99,6 +103,18 @@ export function SkeletonLab() {
         <button type="button" className={buttonClass} onClick={reset}>
           Reset
         </button>
+        <label className="text-sm text-neutral-400" htmlFor="skeleton-facing">
+          Facing (rendered view)
+        </label>
+        <select
+          id="skeleton-facing"
+          className={fieldClass}
+          value={facing}
+          onChange={(event) => setFacing(event.target.value === '-1' ? -1 : 1)}
+        >
+          <option value={1}>right (1)</option>
+          <option value={-1}>left (-1)</option>
+        </select>
       </div>
       <div className="flex flex-wrap items-start gap-6">
         {/* World space is y-up; the view flips y. */}
@@ -188,6 +204,7 @@ export function SkeletonLab() {
             );
           })}
         </svg>
+        <SkeletonCanvas rig={rig} pose={pose} facing={facing} />
         <div className="space-y-4">
           <section aria-labelledby="skeleton-anchors">
             <h2 id="skeleton-anchors" className="mb-1 text-sm text-neutral-400">
@@ -279,8 +296,10 @@ export function SkeletonLab() {
       </div>
       <p className="text-sm text-neutral-400">
         White lines are bones (joint to tip), blue squares are slots (filled when an attachment is
-        active), yellow dots are anchors. Evaluation is <code>@mortal-doctrine/rig</code>; the
-        drawing is a lab-local debug view.
+        active), yellow dots are anchors. Evaluation is <code>@mortal-doctrine/rig</code>; that
+        drawing is a lab-local debug view. The canvas beside it is the production{' '}
+        <code>@mortal-doctrine/skeleton-renderer</code> renderable drawing the same rig and pose
+        with solid-colour placeholder textures, mirrored about the rig origin when facing left.
       </p>
     </section>
   );
