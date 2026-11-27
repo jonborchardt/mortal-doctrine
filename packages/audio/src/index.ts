@@ -10,13 +10,12 @@ export type AudioBus = (typeof AUDIO_BUSES)[number];
  */
 export const DEDUPE_WINDOW_FRAMES = 600;
 /** The triggered-cue log keeps this many entries, oldest dropped first. */
-export const TRIGGERED_LOG_LIMIT = 64;
+const TRIGGERED_LOG_LIMIT = 64;
 
 // ---------------------------------------------------------------------------------------------
 // Web Audio surface the player uses. A real `AudioContext` satisfies it; tests pass a fake.
 
 export interface AudioBufferLike {
-  readonly duration: number;
   getChannelData(channel: number): Float32Array;
 }
 export interface AudioGainLike {
@@ -104,15 +103,6 @@ const soundManifestSchema = z.strictObject({
  * resolves each path against the absolute `manifestUrl`. Returns sound id → absolute URL.
  */
 export function parseSoundManifest(json: unknown, manifestUrl: string): Record<string, string> {
-  const version: unknown =
-    typeof json === 'object' && json !== null && 'schemaVersion' in json
-      ? json.schemaVersion
-      : undefined;
-  if (version !== 1) {
-    throw new Error(
-      `Unsupported sound manifest schemaVersion ${String(version)} in ${manifestUrl}; supported: 1`,
-    );
-  }
   const result = soundManifestSchema.safeParse(json);
   if (!result.success) {
     throw new Error(`Invalid sound manifest ${manifestUrl}: ${describeIssues(result.error)}`);

@@ -238,7 +238,7 @@ describe('cue registry and sound manifest', () => {
       parseSoundManifest({ schemaVersion: 1, sounds: { hit: 'sfx/hit.ogg' } }, MANIFEST_URL),
     ).toEqual({ hit: 'https://example.test/audio/sfx/hit.ogg' });
     expect(() => parseSoundManifest({ schemaVersion: 2, sounds: {} }, MANIFEST_URL)).toThrow(
-      /schemaVersion 2/,
+      /schemaVersion: Invalid input: expected 1/,
     );
     expect(() =>
       parseSoundManifest({ schemaVersion: 1, sounds: { hit: '/hit.ogg' } }, MANIFEST_URL),

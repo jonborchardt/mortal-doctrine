@@ -64,11 +64,11 @@ export function createFakeAudioContext(): FakeAudioContext {
       context.sources.push(source);
       return source;
     },
-    createBuffer: (channels, length, rate) => fakeBuffer(channels, length, rate),
+    createBuffer: (channels, length) => fakeBuffer(channels, length),
     decodeAudioData(data) {
       context.decoded.push(data.byteLength);
       if (data.byteLength === 0) return Promise.reject(new Error('Unable to decode audio data'));
-      return Promise.resolve(fakeBuffer(1, data.byteLength, sampleRate));
+      return Promise.resolve(fakeBuffer(1, data.byteLength));
     },
     resume() {
       context.resumeCalls += 1;
@@ -82,10 +82,9 @@ export function createFakeAudioContext(): FakeAudioContext {
   return context;
 }
 
-function fakeBuffer(channels: number, length: number, rate: number): AudioBufferLike {
+function fakeBuffer(channels: number, length: number): AudioBufferLike {
   const data = Array.from({ length: channels }, () => new Float32Array(length));
   return {
-    duration: length / rate,
     getChannelData: (channel) => {
       const samples = data[channel];
       if (!samples) throw new RangeError(`No channel ${channel}`);

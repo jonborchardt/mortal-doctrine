@@ -19,7 +19,7 @@ production sounds, queueing events that arrive while locked, matching on event f
 | `player.state`                                                 | `'locked'` until the first `pointerdown`/`keydown` on `gestureTarget`, then `'unlocked'`; `'disposed'` after `dispose()`.                |
 | `player.setVolume(bus, 0..1)` / `player.setMuted(bus, bool)`   | Set the bus gain immediately (clamped to 0..1). Muted gain is 0; unmuting restores the last volume. `player.bus(bus)` reads both.        |
 | `player.voices`                                                | Playing voices `{ cue, bus }`, oldest first; a voice leaves when its source ends.                                                        |
-| `player.log`                                                   | Triggered cues `{ frame, type, cue, variation }`, oldest first, last `TRIGGERED_LOG_LIMIT` (64).                                         |
+| `player.log`                                                   | Triggered cues `{ frame, type, cue, variation }`, oldest first, last 64.                                                                 |
 | `player.dispose()`                                             | Stops voices, removes gesture and `ended` listeners, closes the context. Idempotent.                                                     |
 | `parseCueRegistry(json)`                                       | Validates `CueDefinition[]` `{ id, bus: 'sfx'\|'voice'\|'music', variations: soundId[], events: type[] }`; rejects duplicate ids.        |
 | `parseSoundManifest(json, manifestUrl)`                        | Validates `{ schemaVersion: 1, sounds: { id: path } }` (relative, forward slashes, no `..`) and returns id → absolute URL.               |
