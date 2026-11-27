@@ -28,7 +28,7 @@ future milestones, not yet built). Decision records live in [decisions/](decisio
 
 | #   | Layer          | Contains                                                        | Today               |
 | --- | -------------- | --------------------------------------------------------------- | ------------------- |
-| 1   | `foundation`   | math primitives, narrowly scoped shared contracts               | `sim-core`          |
+| 1   | `foundation`   | math primitives, narrowly scoped shared contracts               | `sim-core`, `math`  |
 | 2   | `simulation`   | headless gameplay: state, stepping, movement, collision, combat | `simulation`        |
 | 3   | `animation`    | presentation-independent skeleton and animation evaluation      | —                   |
 | 4   | `presentation` | rendering, effects, camera, audio, browser device adapters      | `renderer`, `input` |
