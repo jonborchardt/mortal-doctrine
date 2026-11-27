@@ -23,7 +23,7 @@ const EVENTS_KEPT = 50;
 interface Session {
   readonly runner: SimulationRunner;
   readonly keyboard: KeyboardInput;
-  /** Recent events, oldest first. Mutated by the loop and controls, never React state. */
+  /** Recent events, oldest first (shown newest first). Mutated by the loop and controls, never React state. */
   readonly log: SimulationEvent[];
 }
 
@@ -95,7 +95,7 @@ export function SimulationLab() {
           if (logText !== shownLog) {
             shownLog = logText;
             eventList.replaceChildren(
-              ...session.log.map((event) => {
+              ...session.log.toReversed().map((event) => {
                 const item = document.createElement('li');
                 item.textContent = formatEvent(event);
                 return item;
@@ -176,8 +176,11 @@ export function SimulationLab() {
           Reset
         </button>
       </div>
+      <h2 id="sim-diagnostics" className="text-sm text-neutral-400">
+        Diagnostics
+      </h2>
       <dl
-        aria-label="Diagnostics"
+        aria-labelledby="sim-diagnostics"
         className="grid w-fit grid-cols-[auto_auto] gap-x-4 font-mono text-xs text-neutral-400"
       >
         <dt>Target tick rate</dt>
@@ -192,16 +195,19 @@ export function SimulationLab() {
         <dd data-readout="frameMs" />
         <dt>Seed</dt>
         <dd data-testid="sim-seed">{LAB_OPTIONS.seed}</dd>
-        <dt>RNG state</dt>
+        <dt>RNG state (no draws yet)</dt>
         <dd data-testid="sim-rng" data-readout="rng" />
       </dl>
+      <h2 id="sim-input-history" className="text-sm text-neutral-400">
+        Input history
+      </h2>
       <dl
-        aria-label="Input history"
+        aria-labelledby="sim-input-history"
         className="grid w-fit grid-cols-[auto_auto] gap-x-4 font-mono text-xs text-neutral-400"
       >
-        <dt>P1 (oldest → newest)</dt>
+        <dt>P1 (last {HISTORY_SHOWN} frames, oldest → newest)</dt>
         <dd data-testid="input-history-p1" data-readout="p1" />
-        <dt>P2 (oldest → newest)</dt>
+        <dt>P2 (last {HISTORY_SHOWN} frames, oldest → newest)</dt>
         <dd data-testid="input-history-p2" data-readout="p2" />
       </dl>
       <div className="flex flex-wrap items-start gap-4">
@@ -210,14 +216,21 @@ export function SimulationLab() {
           data-readout="state"
           data-testid="sim-state"
           aria-label="Simulation state"
-          className="min-w-64 rounded bg-neutral-900 p-3 font-mono text-xs"
+          className="min-w-64 max-w-full overflow-x-auto rounded bg-neutral-900 p-3 font-mono text-xs"
         />
-        <section aria-label="Event log" className="min-w-64 font-mono text-xs">
-          <h2 className="mb-1 text-neutral-400">Events</h2>
-          <ol ref={eventsRef} data-testid="sim-events" className="space-y-0.5" />
+        <section
+          aria-label="Event log"
+          className="min-w-64 rounded bg-neutral-900 p-3 font-mono text-xs"
+        >
+          <h2 className="mb-1 text-neutral-400">Events (newest first, last {EVENTS_KEPT})</h2>
+          <ol
+            ref={eventsRef}
+            data-testid="sim-events"
+            className="max-h-96 space-y-0.5 overflow-y-auto"
+          />
         </section>
       </div>
-      <p className="text-sm text-neutral-500">
+      <p className="text-sm text-neutral-400">
         Player 1: ← → or A / D (↑ ↓ or W / S and buttons U I O J K L are recorded only). Step uses
         held keys.
       </p>
