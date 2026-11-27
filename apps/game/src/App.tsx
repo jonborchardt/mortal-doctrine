@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createInputCapture, DEFAULT_PLAYER_BINDINGS } from '@mortal-doctrine/input';
 import { SUBUNITS_PER_UNIT } from '@mortal-doctrine/sim-core';
-import { createSimulationRunner } from '@mortal-doctrine/simulation';
 
 export function App() {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -18,29 +17,26 @@ export function App() {
 
     // Loaded lazily so PixiJS ships as its own chunk and the page shell paints first.
     import('@mortal-doctrine/renderer')
-      .then(({ createArenaRenderer }) => createArenaRenderer(host))
-      .then((renderer) => {
-        if (disposed) return renderer.destroy();
-        const runner = createSimulationRunner();
+      .then(({ startHostLoop }) => {
+        if (disposed) return;
         const p1 = createInputCapture(DEFAULT_PLAYER_BINDINGS[0]);
         const p2 = createInputCapture(DEFAULT_PLAYER_BINDINGS[1]);
-
         // The per-frame loop lives outside React: HUD text is written directly, never via state.
-        const unsubscribe = renderer.onFrame((elapsedMs) => {
+        const loop = startHostLoop(host, {
           // Sampled once per simulation tick, so taps shorter than a tick are not lost.
-          runner.advance(elapsedMs, () => [p1.sample(), p2.sample()]);
-          renderer.render(runner.state);
-          setText(frameRef.current, String(runner.state.frame));
-          setText(fpsRef.current, String(Math.round(renderer.fps)));
-          setText(p1Ref.current, String(runner.state.fighters[0].x / SUBUNITS_PER_UNIT));
+          inputs: () => [p1.sample(), p2.sample()],
+          onFrame: ({ state }) => {
+            setText(frameRef.current, String(state.frame));
+            setText(fpsRef.current, String(Math.round(loop.renderer?.fps ?? 0)));
+            setText(p1Ref.current, String(state.fighters[0].x / SUBUNITS_PER_UNIT));
+          },
         });
-
         teardown = () => {
-          unsubscribe();
+          loop.destroy();
           p1.dispose();
           p2.dispose();
-          renderer.destroy();
         };
+        return loop.ready;
       })
       .catch((cause: unknown) => {
         console.error(cause);

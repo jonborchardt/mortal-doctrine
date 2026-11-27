@@ -20,6 +20,11 @@ export interface SimulationRunner {
   readonly state: SimulationState;
   readonly paused: boolean;
   /**
+   * Fraction of a tick accumulated but not yet run, in [0, 1); 0 while paused. Presentation may
+   * use it to interpolate between the previous and current snapshot. Never affects state.
+   */
+  readonly alpha: number;
+  /**
    * Feeds real elapsed time from the host and runs as many whole ticks as have accrued, calling
    * `inputs` exactly once per tick. While paused it runs nothing and never calls `inputs`.
    */
@@ -55,6 +60,10 @@ export function createSimulationRunner(options: InitialStateOptions = {}): Simul
     },
     get paused() {
       return paused;
+    },
+    get alpha() {
+      // The epsilon can leave the accumulator a hair below zero after a tick.
+      return Math.max(0, accumulatedMs / TICK_MS);
     },
     advance(elapsedMs, inputs) {
       if (paused) return { ticks: 0, events: NO_EVENTS };

@@ -143,3 +143,235 @@ test('shows seed, RNG state, raw input history and boundary-contact events; Rese
   await expect(history).toBeEmpty();
   await expect(events).toHaveCount(0);
 });
+
+type Rgb = readonly [number, number, number];
+type Point = { readonly x: number; readonly y: number };
+const PLAYER_ONE: Rgb = [0xe0, 0x53, 0x3d];
+const FIXTURE: Rgb = [0x33, 0xff, 0x66];
+const BACKGROUND: Rgb = [0x15, 0x13, 0x1c];
+const FLOOR: Rgb = [0x4a, 0x44, 0x58];
+// Default view at 960×540: 1 world unit = 1 px, ground line at y 460. The fixture is centred on
+// world (240, 70) → C; S is 40 units left of C, inside the 96-px fixture but outside the 60-unit
+// fighter (x 210..270).
+const C: Point = { x: 240, y: 390 };
+const S: Point = { x: 200, y: 390 };
+const FLOOR_POINT: Point = { x: 480, y: 500 };
+
+const arenaCanvas = (page: Page) => page.getByTestId('arena').locator('canvas');
+const fixtureSelect = (page: Page) => page.getByLabel('Fixture renderable');
+
+/** The few browser APIs the in-page sampler uses (e2e code is typed without the DOM lib). */
+interface PixelBrowser {
+  createImageBitmap(blob: Blob): Promise<{ readonly width: number; readonly height: number }>;
+  OffscreenCanvas: new (
+    width: number,
+    height: number,
+  ) => {
+    getContext(type: '2d'): {
+      drawImage(image: unknown, x: number, y: number): void;
+      getImageData(x: number, y: number, w: number, h: number): { data: Uint8ClampedArray };
+    } | null;
+  };
+}
+
+/** Colours at logical canvas points, read from a screenshot (no WebGL readback needed). */
+async function sampleCanvas(page: Page, points: readonly Point[]): Promise<Rgb[]> {
+  const canvas = arenaCanvas(page);
+  const logicalWidth = Number(await canvas.getAttribute('width'));
+  const png = (await canvas.screenshot()).toString('base64');
+  return page.evaluate(
+    async ({ png, points, logicalWidth }) => {
+      const browser = globalThis as unknown as PixelBrowser;
+      const bytes = Uint8Array.from(atob(png), (char) => char.charCodeAt(0));
+      const bitmap = await browser.createImageBitmap(new Blob([bytes], { type: 'image/png' }));
+      // The canvas is CSS-stretched to its host, so scale logical points to screenshot pixels.
+      const scale = bitmap.width / logicalWidth;
+      const context = new browser.OffscreenCanvas(bitmap.width, bitmap.height).getContext('2d');
+      if (!context) throw new Error('No 2D context');
+      context.drawImage(bitmap, 0, 0);
+      return points.map(({ x, y }): [number, number, number] => {
+        const [r = 0, g = 0, b = 0] = context.getImageData(
+          Math.round(x * scale),
+          Math.round(y * scale),
+          1,
+          1,
+        ).data;
+        return [r, g, b];
+      });
+    },
+    { png, points, logicalWidth },
+  );
+}
+
+const near = (actual: Rgb, expected: Rgb) =>
+  actual.every((channel, index) => Math.abs(channel - (expected[index] ?? 0)) <= 24);
+
+/** Polls until every point has (or, with `not`, lacks) its colour. */
+async function expectColours(
+  page: Page,
+  checks: readonly { point: Point; colour: Rgb; not?: boolean }[],
+) {
+  await expect
+    .poll(async () => {
+      const colours = await sampleCanvas(
+        page,
+        checks.map(({ point }) => point),
+      );
+      return checks.map(
+        ({ colour, not = false }, index) => near(colours[index] ?? [0, 0, 0], colour) !== not,
+      );
+    })
+    .toEqual(checks.map(() => true));
+}
+
+interface FixtureLine {
+  id: number;
+  layer: string;
+  updates: number;
+  lastFrame: number;
+  destroys: number;
+  textures: string;
+}
+
+async function fixtureLines(page: Page): Promise<FixtureLine[]> {
+  const text = (await page.getByTestId('fixture-log').textContent()) ?? '';
+  return text.split('\n').flatMap((line) => {
+    const match =
+      /^#(\d+) (\w+): updates (\d+), last frame (-?\d+), destroyed (\d+), textures ([\w ]+)$/.exec(
+        line,
+      );
+    if (!match) return [];
+    const [, id, layer = '', updates, lastFrame, destroys, textures = ''] = match;
+    return [
+      {
+        id: Number(id),
+        layer,
+        updates: Number(updates),
+        lastFrame: Number(lastFrame),
+        destroys: Number(destroys),
+        textures,
+      },
+    ];
+  });
+}
+
+const latestFixture = async (page: Page) => (await fixtureLines(page)).at(-1);
+const fixtureById = async (page: Page, id: number) =>
+  (await fixtureLines(page)).find((line) => line.id === id);
+
+test('registered renderables draw in the layer they name, composited in declared order', async ({
+  page,
+}) => {
+  await page.goto(SIMULATION_LAB);
+  await pausedAt(page);
+  await page.getByRole('button', { name: 'Reset' }).click();
+  await expect(page.getByTestId('sim-frame')).toHaveText('0');
+
+  // (a) No fixture: C is player one, S is not fixture-coloured; the floor is unchanged.
+  await expectColours(page, [
+    { point: C, colour: PLAYER_ONE },
+    { point: S, colour: FIXTURE, not: true },
+    { point: S, colour: BACKGROUND },
+    { point: FLOOR_POINT, colour: FLOOR },
+  ]);
+
+  // (b) In `effects` (declared after `fighters`) the fixture covers the fighter.
+  await fixtureSelect(page).selectOption('effects');
+  await expect(page.getByTestId('fixture-size')).toHaveText('96×32');
+  await expectColours(page, [
+    { point: C, colour: FIXTURE },
+    { point: S, colour: FIXTURE },
+  ]);
+
+  // (c) In `background` (declared before `fighters`) the fighter covers the fixture.
+  await fixtureSelect(page).selectOption('background');
+  await expect.poll(async () => (await latestFixture(page))?.layer).toBe('background');
+  await expectColours(page, [
+    { point: C, colour: PLAYER_ONE },
+    { point: S, colour: FIXTURE },
+  ]);
+
+  // The fixture receives advancing snapshot frames while running.
+  const whilePaused = (await latestFixture(page))?.lastFrame ?? 0;
+  await page.getByRole('button', { name: 'Resume' }).click();
+  await expect
+    .poll(async () => (await latestFixture(page))?.lastFrame ?? -1)
+    .toBeGreaterThan(whilePaused + 5);
+});
+
+test('texture resolution selects the fixture texture logical size', async ({ page }) => {
+  await page.goto(SIMULATION_LAB);
+  const size = page.getByTestId('fixture-size');
+  await expect(size).toHaveText('off');
+  await fixtureSelect(page).selectOption('effects');
+  await expect(size).toHaveText('96×32');
+  await page.getByLabel('Texture resolution').selectOption('1');
+  await expect(size).toHaveText('192×64');
+  await page.getByLabel('Texture resolution').selectOption('2');
+  await expect(size).toHaveText('96×32');
+});
+
+test('a texture that fails to load reports its id and URL without leaking a canvas', async ({
+  page,
+}) => {
+  await page.route('**/fixture-block@2x.png', (route) => route.fulfill({ status: 404 }));
+  await page.goto(SIMULATION_LAB);
+  await expect(arenaCanvas(page)).toHaveCount(1);
+  await fixtureSelect(page).selectOption('effects');
+  const error = page.getByTestId('fixture-error');
+  await expect(error).toContainText('fixture-block');
+  await expect(error).toContainText('/fixtures/renderer/textures/fixture-block@2x.png');
+  await expect(arenaCanvas(page)).toHaveCount(1);
+});
+
+test('the viewport select recreates the loop at the chosen size, leaving one canvas', async ({
+  page,
+}) => {
+  await page.goto(SIMULATION_LAB);
+  await expect(arenaCanvas(page)).toHaveCount(1);
+  await expect(arenaCanvas(page)).toHaveAttribute('width', '960');
+  await expect(arenaCanvas(page)).toHaveAttribute('height', '540');
+  await page.getByLabel('Viewport').selectOption('640x360');
+  await expect(arenaCanvas(page)).toHaveCount(1);
+  await expect(arenaCanvas(page)).toHaveAttribute('width', '640');
+  await expect(arenaCanvas(page)).toHaveAttribute('height', '360');
+  await expect.poll(() => readFrame(page.getByTestId('sim-frame'))).toBeGreaterThan(0);
+});
+
+test('destroying a loop tears down its registered renderable and releases its textures', async ({
+  page,
+}) => {
+  await page.goto(SIMULATION_LAB);
+  await fixtureSelect(page).selectOption('effects');
+  await expect.poll(async () => (await latestFixture(page))?.updates ?? 0).toBeGreaterThan(0);
+  const old = await latestFixture(page);
+  if (!old) throw new Error('No fixture record');
+  expect(old).toMatchObject({ destroys: 0, textures: 'loaded' });
+
+  await page.getByLabel('Viewport').selectOption('640x360');
+  await expect(arenaCanvas(page)).toHaveCount(1);
+  await expect(arenaCanvas(page)).toHaveAttribute('width', '640');
+  await expect
+    .poll(() => fixtureById(page, old.id))
+    .toMatchObject({ destroys: 1, textures: 'released' });
+  const frozen = await fixtureById(page, old.id);
+
+  // The new loop's fixture keeps updating while the destroyed one stays frozen.
+  await expect.poll(async () => (await latestFixture(page))?.id ?? 0).toBeGreaterThan(old.id);
+  const frame = page.getByTestId('sim-frame');
+  const start = await readFrame(frame);
+  await expect.poll(() => readFrame(frame)).toBeGreaterThan(start + 30);
+  expect(await fixtureById(page, old.id)).toEqual(frozen);
+  expect((await latestFixture(page))?.updates).toBeGreaterThan(0);
+});
+
+test('the interpolation checkbox switches the alpha readout', async ({ page }) => {
+  await page.goto(SIMULATION_LAB);
+  const alpha = page.getByTestId('render-alpha');
+  const checkbox = page.getByLabel('Interpolation');
+  await expect(alpha).toHaveText('off');
+  await checkbox.check();
+  await expect(alpha).toHaveText(/^0\.\d{3}$/);
+  await checkbox.uncheck();
+  await expect(alpha).toHaveText('off');
+});
