@@ -61,7 +61,7 @@ const SNAP_DISTANCE = 1;
 const GOLDEN_ANGLE = 2.399963229728653;
 
 /** The span covering both fighters' widest pushboxes, so a crouch or jump never changes it. */
-export function fighterSpan(state: SimulationState): WorldSpan {
+function fighterSpan(state: SimulationState): WorldSpan {
   const edges = state.fighters.flatMap((fighter) => {
     const half = widestPushboxWidth(fighter.params) / 2;
     return [fighter.x - half, fighter.x + half];

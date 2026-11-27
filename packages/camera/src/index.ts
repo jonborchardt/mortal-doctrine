@@ -1,6 +1,5 @@
 export {
   createCamera,
-  fighterSpan,
   visibleSpan,
   type Camera,
   type CameraConfig,

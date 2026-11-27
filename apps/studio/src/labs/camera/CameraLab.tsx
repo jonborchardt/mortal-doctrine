@@ -101,7 +101,6 @@ export function CameraLab() {
   const [ready, setReady] = useState(false);
   const [paused, setPaused] = useState(true);
   const [scenarioId, setScenarioId] = useState(DEFAULT_SCENARIO.id);
-  const [overlay, setOverlay] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -307,12 +306,8 @@ export function CameraLab() {
         <label className="flex items-center gap-1 text-sm text-neutral-400">
           <input
             type="checkbox"
-            checked={overlay}
-            onChange={(event) => {
-              const shown = event.target.checked;
-              setOverlay(shown);
-              act((actions) => actions.setOverlay(shown))();
-            }}
+            defaultChecked
+            onChange={(event) => act((actions) => actions.setOverlay(event.target.checked))()}
           />
           Overlays
         </label>

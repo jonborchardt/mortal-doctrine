@@ -25,7 +25,6 @@ arena package supplies them later.
 | `output.target`                       | `{ left, right }` in sub-units: the visible span the camera is converging to.                                |
 | `output.shake`                        | `{ x, y }` in logical pixels, before the bounds clamp; `{ 0, 0 }` at rest.                                   |
 | `visibleSpan(view, viewportWidth)`    | The world span `{ left, right }` (sub-units) a view shows.                                                   |
-| `fighterSpan(state)`                  | The span covering both fighters' widest pushboxes, which is what the camera frames.                          |
 | `FIXTURE_CAMERA_CONFIG` (`./testing`) | Placeholder configuration for tests and the Camera Lab: 960×540, bounds −4000…100000, `land`/`wall-contact`. |
 
 ## Configuration

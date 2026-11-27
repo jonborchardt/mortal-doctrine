@@ -17,18 +17,15 @@ async function stepTo(page: Page, from: number, to: number) {
   await expect(readout(page, 'frame')).toHaveText(String(to));
 }
 
-/** The visible span readouts are inside the bounds; returns the span that passed. */
+/** The visible span readouts are inside the bounds. */
 async function expectInsideBounds(page: Page) {
-  let span = '';
   await expect
     .poll(async () => {
       const left = await number(page, 'left');
       const right = await number(page, 'right');
-      span = `${left}..${right}`;
       return left >= BOUNDS.left && right <= BOUNDS.right && left < right;
     })
     .toBe(true);
-  return span;
 }
 
 test('camera lab is listed under Presentation and loads directly, paused at the fixture', async ({
