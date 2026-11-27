@@ -11,7 +11,6 @@ const PLANNED: readonly PlannedLab[] = [
   { id: 'collision', name: 'Collision Lab', category: 'Simulation' },
   { id: 'combat', name: 'Combat Lab', category: 'Simulation' },
   { id: 'combo', name: 'Combo Lab', category: 'Simulation' },
-  { id: 'skeleton', name: 'Skeleton Lab', category: 'Animation' },
   { id: 'animation', name: 'Animation Lab', category: 'Animation' },
   { id: 'effects', name: 'Effects Lab', category: 'Presentation' },
   { id: 'camera', name: 'Camera Lab', category: 'Presentation' },

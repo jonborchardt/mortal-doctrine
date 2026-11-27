@@ -1,0 +1,5 @@
+{
+  // No DOM lib and no ambient types: browser and Node APIs are type errors here.
+  "extends": "../../tsconfig.base.json",
+  "include": ["src", "tests"]
+}
