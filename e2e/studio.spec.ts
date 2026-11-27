@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { arenaCanvas, expectColours, type Point, type Rgb } from './canvas';
 
 const SIMULATION_LAB = '/labs/simulation';
 const readFrame = async (frame: Locator) => Number(await frame.textContent());
@@ -144,8 +145,6 @@ test('shows seed, RNG state, raw input history and boundary-contact events; Rese
   await expect(events).toHaveCount(0);
 });
 
-type Rgb = readonly [number, number, number];
-type Point = { readonly x: number; readonly y: number };
 const PLAYER_ONE: Rgb = [0xe0, 0x53, 0x3d];
 const FIXTURE: Rgb = [0x33, 0xff, 0x66];
 const BACKGROUND: Rgb = [0x15, 0x13, 0x1c];
@@ -157,72 +156,7 @@ const C: Point = { x: 240, y: 390 };
 const S: Point = { x: 200, y: 390 };
 const FLOOR_POINT: Point = { x: 480, y: 500 };
 
-const arenaCanvas = (page: Page) => page.getByTestId('arena').locator('canvas');
 const fixtureSelect = (page: Page) => page.getByLabel('Fixture renderable');
-
-/** The few browser APIs the in-page sampler uses (e2e code is typed without the DOM lib). */
-interface PixelBrowser {
-  createImageBitmap(blob: Blob): Promise<{ readonly width: number; readonly height: number }>;
-  OffscreenCanvas: new (
-    width: number,
-    height: number,
-  ) => {
-    getContext(type: '2d'): {
-      drawImage(image: unknown, x: number, y: number): void;
-      getImageData(x: number, y: number, w: number, h: number): { data: Uint8ClampedArray };
-    } | null;
-  };
-}
-
-/** Colours at logical canvas points, read from a screenshot (no WebGL readback needed). */
-async function sampleCanvas(page: Page, points: readonly Point[]): Promise<Rgb[]> {
-  const canvas = arenaCanvas(page);
-  const logicalWidth = Number(await canvas.getAttribute('width'));
-  const png = (await canvas.screenshot()).toString('base64');
-  return page.evaluate(
-    async ({ png, points, logicalWidth }) => {
-      const browser = globalThis as unknown as PixelBrowser;
-      const bytes = Uint8Array.from(atob(png), (char) => char.charCodeAt(0));
-      const bitmap = await browser.createImageBitmap(new Blob([bytes], { type: 'image/png' }));
-      // The canvas is CSS-stretched to its host, so scale logical points to screenshot pixels.
-      const scale = bitmap.width / logicalWidth;
-      const context = new browser.OffscreenCanvas(bitmap.width, bitmap.height).getContext('2d');
-      if (!context) throw new Error('No 2D context');
-      context.drawImage(bitmap, 0, 0);
-      return points.map(({ x, y }): [number, number, number] => {
-        const [r = 0, g = 0, b = 0] = context.getImageData(
-          Math.round(x * scale),
-          Math.round(y * scale),
-          1,
-          1,
-        ).data;
-        return [r, g, b];
-      });
-    },
-    { png, points, logicalWidth },
-  );
-}
-
-const near = (actual: Rgb, expected: Rgb) =>
-  actual.every((channel, index) => Math.abs(channel - (expected[index] ?? 0)) <= 24);
-
-/** Polls until every point has (or, with `not`, lacks) its colour. */
-async function expectColours(
-  page: Page,
-  checks: readonly { point: Point; colour: Rgb; not?: boolean }[],
-) {
-  await expect
-    .poll(async () => {
-      const colours = await sampleCanvas(
-        page,
-        checks.map(({ point }) => point),
-      );
-      return checks.map(
-        ({ colour, not = false }, index) => near(colours[index] ?? [0, 0, 0], colour) !== not,
-      );
-    })
-    .toEqual(checks.map(() => true));
-}
 
 interface FixtureLine {
   id: number;

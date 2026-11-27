@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "textures": {
+    "body-plain": "textures/body-plain@2x.png",
+    "body-robe": "textures/body-robe@2x.png",
+    "face-neutral": "textures/face-neutral@2x.png",
+    "face-angry": "textures/face-angry@2x.png",
+    "staff": "textures/staff@2x.png",
+    "tail-plain": "textures/tail-plain@2x.png",
+    "tail-spiked": "textures/tail-spiked@2x.png",
+    "body-armor": "textures/body-armor@2x.png",
+    "wing-left-feathers": "textures/wing-left-feathers@2x.png",
+    "wing-left-membrane": "textures/wing-left-membrane@2x.png",
+    "wing-right-feathers": "textures/wing-right-feathers@2x.png",
+    "wing-right-membrane": "textures/wing-right-membrane@2x.png",
+    "shell-plain": "textures/shell-plain@2x.png"
+  }
+}
