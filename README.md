@@ -6,7 +6,7 @@ is combat depth comparable to traditional competitive fighters: deterministic fr
 simulation, asymmetric character mechanics and expressive skeletal animation.
 
 **Status: M0 (foundation).** The repository contains the architecture, tooling and a hello-world
-slice: two placeholder fighters, one keyboard-controlled, on a fixed-step simulation rendered
+slice: two placeholder fighters, keyboard- or gamepad-controlled, on a fixed-step simulation rendered
 by PixiJS, plus a Studio with a Simulation Lab. No combat, characters or animation exist yet.
 See [docs/roadmap.md](docs/roadmap.md).
 

@@ -97,6 +97,9 @@ Character APIs do not exist yet (M2–M3). The fixed parts:
   submission; GPU time excluded). It also shows the seed, the RNG state, recent raw input
   history per player (direction and button glyphs) and an event log with frame numbers. The game
   shows frame number, FPS and player one's x in world units.
+- The Input Lab (`/labs/input`) shows, per player, raw device state (held keys, gamepad buttons
+  and stick), presses latched for the next tick, the frames sampled each tick, and a log of
+  latched taps. Pause and Step make single ticks observable.
 - Diagnostics are measured by the host app around simulation calls; the simulation itself never
   reads clocks.
 - `pnpm bench` runs headless Vitest benchmarks (`tests/*.bench.ts`). Compare results only on the

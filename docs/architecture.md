@@ -6,7 +6,7 @@ future milestones, not yet built). Decision records live in [decisions/](decisio
 ## Overview — Implemented
 
 ```text
- keyboard ──▶ input ──▶ InputFrame (sim-core bitmask), once per tick
+ keyboard, gamepad ──▶ input ──▶ InputFrame (sim-core bitmask), once per tick
                                      ▼
                  simulation (pure, 60 Hz fixed step, built on sim-core)
                  state + FrameInputs ──step──▶ { state, events }
@@ -176,7 +176,9 @@ DOM-free `tsconfig` (copy `packages/simulation`); the determinism rules then app
 **Four kinds of input data, kept distinct:**
 
 1. **Device event buffering** — transient key/gamepad state inside presentation-layer device
-   adapters (`@mortal-doctrine/input`). Never simulation state. Latching and gamepads are M1.02.
+   adapters (`@mortal-doctrine/input`). Never simulation state. Key presses are latched until
+   the next per-tick sample, so a tap shorter than a tick is not lost; gamepads are polled at
+   the sample.
 2. **Current authoritative input** — the `FrameInputs` passed to `step` for this frame: exactly
    one `InputFrame` per player. The runner's provider is called once per tick with the frame
    about to be processed.
@@ -258,10 +260,10 @@ concern (see Layers). Visual animation never determines combat timing; move fram
 
 Each lab is a folder `apps/studio/src/labs/<id>/` with a `lab.ts` exporting a typed
 `LabDefinition`; discovery is automatic (`import.meta.glob`). Every lab has the stable URL
-`/labs/<id>`. Only the Simulation Lab exists. See [development.md](development.md#adding-a-studio-lab).
+`/labs/<id>`. The Simulation Lab and the Input Lab exist. See [development.md](development.md#adding-a-studio-lab).
 
 ## Deferred functionality (explicit non-goals of M0)
 
 Combat, hitboxes, collision, jumping, combos, special moves, skeletal animation, characters,
 arenas, effects, camera, audio, AI, replays, menus, settings, persistence, networking, rollback,
-render interpolation, gamepad input. (The seeded RNG and simulation events now exist; see above.)
+render interpolation. (The seeded RNG, simulation events and gamepad input now exist; see above.)

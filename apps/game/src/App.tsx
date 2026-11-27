@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { createKeyboardInput } from '@mortal-doctrine/input';
-import { NEUTRAL_INPUT, SUBUNITS_PER_UNIT } from '@mortal-doctrine/sim-core';
+import { createInputCapture, DEFAULT_PLAYER_BINDINGS } from '@mortal-doctrine/input';
+import { SUBUNITS_PER_UNIT } from '@mortal-doctrine/sim-core';
 import { createSimulationRunner } from '@mortal-doctrine/simulation';
 
 export function App() {
@@ -22,12 +22,13 @@ export function App() {
       .then((renderer) => {
         if (disposed) return renderer.destroy();
         const runner = createSimulationRunner();
-        const keyboard = createKeyboardInput(window);
+        const p1 = createInputCapture(DEFAULT_PLAYER_BINDINGS[0]);
+        const p2 = createInputCapture(DEFAULT_PLAYER_BINDINGS[1]);
 
         // The per-frame loop lives outside React: HUD text is written directly, never via state.
         const unsubscribe = renderer.onFrame((elapsedMs) => {
-          // Sampled once per simulation tick; player two is idle until a second device exists.
-          runner.advance(elapsedMs, () => [keyboard.read(), NEUTRAL_INPUT]);
+          // Sampled once per simulation tick, so taps shorter than a tick are not lost.
+          runner.advance(elapsedMs, () => [p1.sample(), p2.sample()]);
           renderer.render(runner.state);
           setText(frameRef.current, String(runner.state.frame));
           setText(fpsRef.current, String(Math.round(renderer.fps)));
@@ -36,7 +37,8 @@ export function App() {
 
         teardown = () => {
           unsubscribe();
-          keyboard.dispose();
+          p1.dispose();
+          p2.dispose();
           renderer.destroy();
         };
       })
@@ -66,7 +68,9 @@ export function App() {
         </span>
       </div>
       <div ref={hostRef} data-testid="arena" className="w-full max-w-[960px]" />
-      <p className="text-sm text-neutral-500">Move with ← → or A / D</p>
+      <p className="text-sm text-neutral-500">
+        Player 1: ← → or A / D · Player 2: numpad 4 / 6 or the first gamepad
+      </p>
       {error && <p className="text-red-400">Renderer failed: {error}</p>}
     </main>
   );
