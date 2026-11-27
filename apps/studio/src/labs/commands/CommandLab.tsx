@@ -31,6 +31,8 @@ interface Session {
   source: string;
   /** Recognized commands, oldest first. Mutated by the loop and controls, never React state. */
   readonly log: string[];
+  /** Bumped by every `load`, so the loop redraws even when the new run ends on the same frame. */
+  loads: number;
 }
 
 export function CommandLab() {
@@ -54,6 +56,7 @@ export function CommandLab() {
       ],
       source: COMMAND_SCRIPTS[0]?.id ?? LIVE,
       log: [],
+      loads: 0,
     };
     sessionRef.current = session;
     load(session);
@@ -72,6 +75,7 @@ export function CommandLab() {
     // Per-frame work stays outside React; React only handles control clicks.
     let last: number | undefined;
     let shownFrame = -1;
+    let shownLoads = -1;
     let shownLog = '';
     let request = requestAnimationFrame(function loop(now) {
       const { events } = runner.advance(last === undefined ? 0 : now - last, (frame) =>
@@ -80,8 +84,9 @@ export function CommandLab() {
       record(session, events);
       last = now;
       const { state } = runner;
-      if (state.frame !== shownFrame) {
+      if (state.frame !== shownFrame || session.loads !== shownLoads) {
         shownFrame = state.frame;
+        shownLoads = session.loads;
         write('frame', String(state.frame));
         const facing = playerFacing(state);
         for (const player of PLAYERS) write(`facing-${player}`, facing[player]);
@@ -153,7 +158,12 @@ export function CommandLab() {
             aria-label="Input source"
             className="rounded bg-neutral-800 px-2 py-1 text-sm text-neutral-100"
             value={source}
-            onChange={(event) => choose(event.target.value)}
+            onChange={(event) => {
+              // A focused select would take the arrow keys that drive player 1 and switch away
+              // from live input.
+              if (event.target.value === LIVE) event.target.blur();
+              choose(event.target.value);
+            }}
           >
             {COMMAND_SCRIPTS.map((script) => (
               <option key={script.id} value={script.id}>
@@ -214,9 +224,10 @@ function load(session: Session) {
   runner.pause();
   runner.reset();
   log.length = 0;
+  session.loads += 1;
   // Drop presses latched while the lab was not sampling.
   for (const player of session.players) player.sample();
-  const script = COMMAND_SCRIPTS.find((candidate) => candidate.id === session.source);
+  const script = scriptFor(session);
   if (!script) return;
   for (const inputs of script.inputs)
     record(
@@ -227,7 +238,11 @@ function load(session: Session) {
 
 function provide(session: Session, frame: number): FrameInputs {
   if (session.source === LIVE) return [session.players[0].sample(), session.players[1].sample()];
-  return COMMAND_SCRIPTS.find((script) => script.id === session.source)?.inputs[frame] ?? IDLE;
+  return scriptFor(session)?.inputs[frame] ?? IDLE;
+}
+
+function scriptFor(session: Session) {
+  return COMMAND_SCRIPTS.find((script) => script.id === session.source);
 }
 
 function record(session: Session, events: readonly SimulationEvent[]) {

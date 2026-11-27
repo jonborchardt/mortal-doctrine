@@ -82,3 +82,37 @@ test('live input: a quarter-circle entered frame by frame is recognized, Reset r
   await expect(frame).toHaveText('11');
   await expect(log).toHaveText(['frame 4 · P1 · quarter-circle', 'frame 4 · P2 · quarter-circle']);
 });
+
+test('switching between fixtures that end on the same frame redraws the timeline', async ({
+  page,
+}) => {
+  await page.goto(COMMAND_LAB);
+  const p1 = page.getByTestId('command-timeline').getByRole('row').nth(1);
+  await expect(p1).toHaveText('P1··↓↘→1······');
+  await page
+    .getByRole('combobox', { name: 'Input source' })
+    .selectOption({ label: 'Fixture: Dragon punch + A2' });
+  await expect(page.getByTestId('command-frame')).toHaveText('11');
+  await expect(page.getByTestId('command-log').getByRole('listitem')).toHaveText([
+    'frame 4 · P1 · dragon-punch',
+    'frame 4 · P2 · dragon-punch',
+  ]);
+  await expect(p1).toHaveText('P1··→↓↘2······');
+});
+
+test('arrow keys in live mode drive player 1 instead of the source select', async ({ page }) => {
+  await page.goto(COMMAND_LAB);
+  const source = page.getByRole('combobox', { name: 'Input source' });
+  // Choose Live from the keyboard, as a user would; the select must not keep the arrow keys.
+  await source.focus();
+  await page.keyboard.press('End');
+  await expect(source).toHaveValue('live');
+  await expect(page.getByTestId('command-frame')).toHaveText('0');
+  await page.keyboard.down('ArrowUp');
+  await expect(source).toHaveValue('live');
+  await page.getByRole('button', { name: 'Step' }).click();
+  await page.keyboard.up('ArrowUp');
+  await expect(source).toHaveValue('live');
+  await expect(page.getByTestId('command-frame')).toHaveText('1');
+  await expect(page.getByTestId('command-timeline').getByRole('row').nth(1)).toHaveText('P1↑');
+});
