@@ -53,6 +53,9 @@ goes in `packages/`. Never add a catch-all `utils`/`common`/`shared` package.
 ## Build and verification
 
 - pnpm only. Never edit `pnpm-lock.yaml` by hand; commit it with dependency changes.
+- `main` is protected: every change lands through a pull request with both CI jobs
+  (`verify (ubuntu-latest)`, `verify (windows-latest)`) green on a branch that is up to date.
+  Never push to `main` directly.
 - Before declaring work done: `pnpm check` (format, lint, typecheck, boundaries, unit tests,
   builds) **and** `pnpm test:e2e` when anything browser-facing changed (`pnpm check:all` runs
   both; CI and orch always run both). Report real output.
@@ -88,8 +91,9 @@ extension or stop and document it as a recommended separate ticket — never sil
 unrelated subsystem or a downstream ticket. No opportunistic refactors, unrelated formatting, or
 edits to unrelated packages. Changes to shared contracts, root config or layer rules must be
 necessary, intentional and called out in the summary. Do not start, close or modify existing orch
-tickets unless explicitly instructed; log newly discovered work as described in "Working with
-orch".
+tickets unless explicitly instructed. Log newly discovered out-of-scope work (bugs, debt,
+follow-ups) as a new ticket instead of doing it — logging future work is expected; expanding the
+current ticket is not.
 
 ## Worktrees and parallel development
 
@@ -97,12 +101,14 @@ Work from any checkout path; never hard-code absolute paths, global temp files o
 tests. `pnpm test:e2e` starts its own servers on free ports — never point tests at an existing
 server. Keep new code in subsystem-local files, new labs in their own folder
 (`apps/studio/src/labs/<id>/`), and character content in its own `characters/<id>/` package.
-On a `pnpm-lock.yaml` merge conflict, take the base version and re-run `pnpm install`; never
-hand-merge it. Stop every process you start (see Windows note in `docs/development.md`).
+On a `pnpm-lock.yaml` conflict, follow the lockfile procedure in `docs/build-system.md`: resolve
+the `package.json` files first, regenerate the lockfile with the pinned pnpm, verify with
+`pnpm install --frozen-lockfile`. Never hand-merge it or silently drop either side's dependency
+changes. Stop every process you start (see Windows note in `docs/development.md`).
 
 ## Working with orch
 
-- Work is tracked as orch tickets: `/log-todo` or
+- Work is tracked as orch tickets; log newly discovered work automatically: `/log-todo` or
   `orch ticket add "<title>" --type bug|feature|chore --area <a> --priority P1-P5`, run from this
   repo. Never use a TODO file.
 - Never edit orch's database, job artifacts, or worktrees directly. Use only `orch` commands.
