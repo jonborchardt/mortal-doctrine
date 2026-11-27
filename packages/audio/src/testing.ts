@@ -25,7 +25,8 @@ export interface FakeAudioContext extends AudioContextLike {
 }
 
 /** A recording stand-in for `AudioContext`; nothing is audible. */
-export function createFakeAudioContext(sampleRate = 8000): FakeAudioContext {
+export function createFakeAudioContext(): FakeAudioContext {
+  const sampleRate = 8000;
   const context: FakeAudioContext = {
     destination: { kind: 'destination' },
     sampleRate,
@@ -113,7 +114,7 @@ export class FakeGestureTarget extends EventTarget {
 }
 
 /** Sound id → placeholder tone (frequency Hz, duration ms). */
-export const FIXTURE_TONES: Readonly<Record<string, { frequency: number; durationMs: number }>> = {
+const FIXTURE_TONES: Readonly<Record<string, { frequency: number; durationMs: number }>> = {
   'command-low': { frequency: 330, durationMs: 120 },
   'command-mid': { frequency: 440, durationMs: 120 },
   'command-high': { frequency: 554, durationMs: 120 },
@@ -147,14 +148,11 @@ export const FIXTURE_EVENTS: readonly FixtureEvent[] = [
   { type: 'wall-contact', frame: 70, player: 1, side: 'right' },
 ];
 
-/** Synthesizes decaying sine tones in memory, keyed by sound id (default `FIXTURE_TONES`). */
-export function createToneBuffers(
-  context: AudioContextLike,
-  tones: Readonly<Record<string, { frequency: number; durationMs: number }>> = FIXTURE_TONES,
-): Record<string, AudioBufferLike> {
+/** Synthesizes the fixture sounds as decaying sine tones in memory, keyed by sound id. */
+export function createToneBuffers(context: AudioContextLike): Record<string, AudioBufferLike> {
   const rate = context.sampleRate;
   return Object.fromEntries(
-    Object.entries(tones).map(([id, { frequency, durationMs }]) => {
+    Object.entries(FIXTURE_TONES).map(([id, { frequency, durationMs }]) => {
       const length = Math.max(1, Math.round((rate * durationMs) / 1000));
       const buffer = context.createBuffer(1, length, rate);
       const samples = buffer.getChannelData(0);
