@@ -40,7 +40,11 @@ test('pose constraints lab is listed as available and loads directly on its fixt
   await expect(view.locator('[data-limit="head"]')).toBeVisible();
   await expect(page.getByTestId('pose-target-handle')).toBeVisible();
 
-  await expect(page.getByLabel('Mix')).toHaveValue('1');
+  await expect(page.getByRole('slider', { name: 'Mix', exact: true })).toHaveValue('1');
+  await expect(page.getByLabel('Bend').getByRole('option')).toHaveText([
+    'counter-clockwise elbow (1)',
+    'clockwise elbow (-1)',
+  ]);
   await expect(page.getByLabel('Bend')).toHaveValue('1');
   await expect(page.getByTestId('pose-target')).toHaveText('50.00, 120.00');
   await expect(page.getByTestId('pose-effector')).toHaveText('50.00, 120.00');
@@ -62,6 +66,7 @@ test('dragging the target moves the hand onto reachable targets and to full reac
   await expect(target).toHaveText('40.00, 110.00');
   await expect(effector).toHaveText('40.00, 110.00');
   await expect(reach).toHaveText('46.86');
+  await expect(page.getByTestId('pose-out-of-reach')).toHaveCount(0);
   // Review evidence: a reachable target.
   await page.screenshot({
     path: testInfo.outputPath('pose-constraints-reachable.png'),
@@ -72,6 +77,7 @@ test('dragging the target moves the hand onto reachable targets and to full reac
   await dragTargetTo(page, 110, 60);
   await expect(target).toHaveText('110.00, 60.00');
   await expect(reach).toHaveText('58.00');
+  await expect(page.getByTestId('pose-out-of-reach')).toHaveText('(target out of reach)');
   await expect(effector).toHaveText('53.97, 108.18');
   await expect(page.getByTestId('pose-limit-forearm-right')).toHaveText('0.00°');
   // Review evidence: an unreachable target.
@@ -118,6 +124,20 @@ test('bend flips the elbow, the target can be typed, and reset returns to the fi
   await page.getByLabel('Target y').fill('170');
   await expect(page.getByTestId('pose-target')).toHaveText('30.00, 170.00');
   await expect(effector).toHaveText('30.00, 170.00');
+
+  // Typed key by key, a negative value passes through a lone "-", which is not a number yet.
+  const targetY = page.getByLabel('Target y');
+  await targetY.press('ControlOrMeta+a');
+  await targetY.pressSequentially('-10');
+  await expect(targetY).toHaveValue('-10');
+  await expect(page.getByTestId('pose-target')).toHaveText('30.00, -10.00');
+
+  // A typed value is held inside the view, like a dragged one.
+  const targetX = page.getByLabel('Target x');
+  await targetX.fill('500');
+  await expect(page.getByTestId('pose-target')).toHaveText('130.00, -10.00');
+  await targetX.blur();
+  await expect(targetX).toHaveValue('130');
 
   await page.getByRole('button', { name: 'Reset', exact: true }).click();
   await expect(page.getByLabel('Bend')).toHaveValue('1');

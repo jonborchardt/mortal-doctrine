@@ -24,6 +24,9 @@ const distance = (a: Vec2, b: Vec2) => Math.hypot(a.x - b.x, a.y - b.y);
 
 export function PoseConstraintsLab() {
   const [target, setTarget] = useState<Vec2>(START.target);
+  // The text being typed into a target field. A controlled number input cannot hold a lone "-",
+  // so the field shows this until it loses focus.
+  const [typing, setTyping] = useState<{ axis: 'x' | 'y'; text: string } | null>(null);
   const [bend, setBend] = useState(START.bend);
   const [mix, setMix] = useState(START.mix);
 
@@ -60,6 +63,9 @@ export function PoseConstraintsLab() {
   const effector = forearm?.tip ?? root;
   const fullReach = forearm ? distance(root, forearm.origin) + forearm.length : 0;
 
+  const fieldClass = 'rounded bg-neutral-800 px-2 py-1 text-sm';
+  const labelClass = 'flex items-center gap-2 text-sm text-neutral-400';
+
   const dragTo = (event: PointerEvent<SVGCircleElement>) => {
     const matrix = event.currentTarget.ownerSVGElement?.getScreenCTM()?.inverse();
     if (!matrix) return;
@@ -70,43 +76,34 @@ export function PoseConstraintsLab() {
       y: clamp(Math.round(-at.y), VIEW.bottom, VIEW.top),
     });
   };
-  const setCoordinate = (axis: 'x' | 'y', value: number) => {
-    if (Number.isFinite(value)) setTarget({ ...target, [axis]: value });
-  };
-
-  const fieldClass = 'rounded bg-neutral-800 px-2 py-1 text-sm';
-  const labelClass = 'flex items-center gap-2 text-sm text-neutral-400';
+  const targetField = (axis: 'x' | 'y', min: number, max: number) => (
+    <input
+      type="number"
+      className={`${fieldClass} w-20`}
+      min={min}
+      max={max}
+      value={typing?.axis === axis ? typing.text : target[axis]}
+      onChange={(event) => {
+        setTyping({ axis, text: event.target.value });
+        const value = event.target.valueAsNumber;
+        // Held inside the view, like a dragged target.
+        if (Number.isFinite(value)) setTarget({ ...target, [axis]: clamp(value, min, max) });
+      }}
+      onBlur={() => setTyping(null)}
+    />
+  );
 
   return (
     <section className="space-y-4">
       <h1 className="text-xl font-semibold">Pose Constraints Lab</h1>
       <div className="flex flex-wrap items-center gap-4">
-        <label className={labelClass}>
-          Target x
-          <input
-            type="number"
-            className={`${fieldClass} w-20`}
-            min={VIEW.left}
-            max={VIEW.right}
-            value={target.x}
-            onChange={(event) => setCoordinate('x', event.target.valueAsNumber)}
-          />
-        </label>
-        <label className={labelClass}>
-          Target y
-          <input
-            type="number"
-            className={`${fieldClass} w-20`}
-            min={VIEW.bottom}
-            max={VIEW.top}
-            value={target.y}
-            onChange={(event) => setCoordinate('y', event.target.valueAsNumber)}
-          />
-        </label>
+        <label className={labelClass}>Target x{targetField('x', VIEW.left, VIEW.right)}</label>
+        <label className={labelClass}>Target y{targetField('y', VIEW.bottom, VIEW.top)}</label>
         <label className={labelClass}>
           Mix
           <input
             type="range"
+            aria-label="Mix"
             min={0}
             max={1}
             step={0.05}
@@ -124,8 +121,8 @@ export function PoseConstraintsLab() {
             value={bend}
             onChange={(event) => setBend(event.target.value === '1' ? 1 : -1)}
           >
-            <option value={1}>elbow left of the reach line (1)</option>
-            <option value={-1}>elbow right of the reach line (-1)</option>
+            <option value={1}>counter-clockwise elbow (1)</option>
+            <option value={-1}>clockwise elbow (-1)</option>
           </select>
         </label>
         <button
@@ -222,6 +219,9 @@ export function PoseConstraintsLab() {
               <dd>
                 <span data-testid="pose-effector-distance">{fixed(distance(root, effector))}</span>{' '}
                 of {fixed(fullReach)} full reach
+                {distance(root, target) > fullReach ? (
+                  <span data-testid="pose-out-of-reach"> (target out of reach)</span>
+                ) : null}
               </dd>
             </dl>
           </section>

@@ -228,6 +228,18 @@ describe('mix weights', () => {
     for (const bone of ['upper-arm-right', 'forearm-right', 'head']) {
       expect(rotationOf(full, bone)).toBe(rotationOf(fromRest, bone));
     }
+
+    // One full turn off the solved values: still the solved values, not an equivalent angle.
+    const turned = stageAt(1)(MANNEQUIN, {
+      bones: {
+        'upper-arm-right': { rotation: rotationOf(full, 'upper-arm-right') + TAU },
+        'forearm-right': { rotation: rotationOf(full, 'forearm-right') - TAU },
+        head: { rotation: rotationOf(full, 'head') + TAU },
+      },
+    });
+    for (const bone of ['upper-arm-right', 'forearm-right', 'head']) {
+      expect(rotationOf(turned, bone)).toBe(rotationOf(full, bone));
+    }
   });
 
   it('passes everything but the constrained rotations through', () => {
