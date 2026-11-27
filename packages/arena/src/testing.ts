@@ -7,9 +7,11 @@ const row = (texture: string, xs: readonly number[]) => xs.map((x) => ({ texture
 /**
  * Four layers over the default 96000-wide gameplay arena, visual bounds 4000 sub-units beyond
  * each wall (parallax reference x = 48000). The ground strip is authored from y = 0 with its
- * top at `groundLine` 10000; everything else stands on it. Texture sizes in world units (the
- * manifest is the Studio fixture `fixtures/arena/manifest.json`): `sky` 1040×620, `far-tower`
- * 160×300, `mid-block` 100×160, `ground` 1040×100, `ground-post` 30×70.
+ * top at `groundLine` 10000; towers, blocks and posts stand on it and the sun (fixed on screen)
+ * hangs 150 world units above it. There is no backdrop image: the renderer background shows
+ * through, which keeps software-rendered browser tests cheap. Texture sizes in world units (the
+ * manifest is the Studio fixture `fixtures/arena/manifest.json`): `sun` 60×60, `far-tower`
+ * 100×200, `mid-block` 70×120, `ground` 1040×100, `ground-post` 30×70.
  */
 export const PLACEHOLDER_ARENA: Arena = {
   schemaVersion: 1,
@@ -17,7 +19,7 @@ export const PLACEHOLDER_ARENA: Arena = {
   groundLine: 10_000,
   visualBounds: { left: -4000, right: 100_000 },
   layers: [
-    { id: 'sky', parallax: 0, images: [{ texture: 'sky', x: -4000, y: 0 }] },
+    { id: 'sky', parallax: 0, images: [{ texture: 'sun', x: 45_000, y: 25_000 }] },
     { id: 'far', parallax: 0.25, images: row('far-tower', [-12_000, 24_000, 60_000, 96_000]) },
     {
       id: 'mid',
