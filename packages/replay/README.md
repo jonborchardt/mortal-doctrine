@@ -35,11 +35,11 @@ accidental edits, not deliberate forgery.
 
 | Export                                                                   | Purpose                                                                                                                                                    |
 | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `replaySchema`, `Replay`, `ReplayChecksum`                               | Zod schema and types of the format                                                                                                                         |
+| `replaySchema`, `Replay`                                                 | Zod schema and types of the format                                                                                                                         |
 | `REPLAY_VERSION`                                                         | `1`                                                                                                                                                        |
 | `serializeReplay(replay)` / `deserializeReplay(json)`                    | JSON export and import. Import throws on text that is not JSON, an unknown `replayVersion` (naming found and supported) and schema failures (naming paths) |
 | `hashState(state)`                                                       | Deterministic hash of `serializeState(state)`                                                                                                              |
-| `createReplayRecorder({ options?, checksumInterval?, getState })`        | Recorder: `length`, `provider(inner)`, `finish()`. `DEFAULT_CHECKSUM_INTERVAL` is `60`                                                                     |
+| `createReplayRecorder({ options?, checksumInterval?, getState })`        | Recorder: `length`, `provider(inner)`, `finish()`. `checksumInterval` defaults to `60`                                                                     |
 | `createReplayPlayer(replay)`                                             | Player: `state`, `frame`, `length`, `paused`, `desync`, `play()`, `pause()`, `advance(elapsedMs)`, `stepOnce()`, `seek(frame)`                             |
 | `ReplayRecorder`, `ReplayRecorderConfig`, `ReplayPlayer`, `ReplayDesync` | Their types                                                                                                                                                |
 

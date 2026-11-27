@@ -10,7 +10,7 @@ import {
 import { REPLAY_VERSION, type Replay, type ReplayChecksum } from './format';
 import { digestInputs, EMPTY_INPUTS_DIGEST, formatHash, hashState } from './hash';
 
-export const DEFAULT_CHECKSUM_INTERVAL = 60;
+const DEFAULT_CHECKSUM_INTERVAL = 60;
 
 export interface ReplayRecorderConfig {
   /** The options the recorded session was created with. */
