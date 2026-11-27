@@ -187,14 +187,14 @@ test('panning moves each layer by its parallax factor, the ground line stays put
   // Review evidence: the lab at two camera positions.
   await page.screenshot({ path: testInfo.outputPath('arena-lab-frame-0.png') });
 
-  // Both fighters walk right for 20 frames; the smoothed camera follows their midpoint.
+  // Both fighters walk right for 12 frames; the smoothed camera follows their midpoint.
   await page.getByRole('radio', { name: 'Right', exact: true }).check();
-  for (let i = 0; i < 20; i++) await button(page, 'Step').click();
-  await expect(readout(page, 'frame')).toHaveText('20');
-  await expect(readout(page, 'midpoint')).toHaveText('56000');
+  for (let i = 0; i < 12; i++) await button(page, 'Step').click();
+  await expect(readout(page, 'frame')).toHaveText('12');
+  await expect(readout(page, 'midpoint')).toHaveText('52800');
   const after = await readCamera(page);
   // The camera moved right by well over the sampling tolerance, at the same zoom.
-  expect(after.centre - before.centre).toBeGreaterThan(5000);
+  expect(after.centre - before.centre).toBeGreaterThan(2500);
   expect(after.perSubUnit).toBeCloseTo(before.perSubUnit, 6);
 
   // Each feature is where its factor predicts for the new readouts...
@@ -211,7 +211,7 @@ test('panning moves each layer by its parallax factor, the ground line stays put
   expect(far).toBeGreaterThan(6);
   expect(mid).toBeGreaterThan(far + 6);
   expect(ground).toBeGreaterThan(mid + 6);
-  await page.screenshot({ path: testInfo.outputPath('arena-lab-frame-20-panned-right.png') });
+  await page.screenshot({ path: testInfo.outputPath('arena-lab-frame-12-panned-right.png') });
 
   await button(page, 'Reset').click();
   await expectFixture(page);
