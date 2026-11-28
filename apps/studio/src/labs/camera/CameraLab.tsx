@@ -344,7 +344,9 @@ export function CameraLab() {
         snapshot and its events into the renderer&apos;s view. Overlays: grey ground ticks every 100
         world units, yellow bars at the visual bounds, cyan bars at the edges of the frame the
         camera is converging to, a white line at the fighters&apos; midpoint. A shake trigger adds
-        its event to the next tick, so while paused it shows on Step.
+        its event to the next tick, so while paused it shows on Step. A jump zooms out to keep the
+        configured headroom above the jumper in frame; the placeholder rectangles stay on the
+        ground.
       </p>
       {error && <p className="text-red-400">Renderer failed: {error}</p>}
     </section>

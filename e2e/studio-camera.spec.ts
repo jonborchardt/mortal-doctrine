@@ -91,6 +91,33 @@ test('separating fighters zooms out inside the bounds; Reset restores frame 0', 
   await expect(page.getByRole('main').locator('canvas')).toHaveCount(1);
 });
 
+test('a jump zooms out while airborne and returns to the grounded framing after landing', async ({
+  page,
+}) => {
+  await page.goto(CAMERA_LAB);
+  await page.getByRole('combobox', { name: 'Scenario' }).selectOption('neutral-jump');
+  await expect(readout(page, 'frame')).toHaveText('0');
+  await expect(readout(page, 'scale')).toHaveText('1.3714');
+
+  // The apex, 200 world units up, with 200 of headroom in the 460 px above the ground line:
+  // 834.78 world units across.
+  await stepTo(page, 0, 20);
+  await expect(readout(page, 'scale')).toHaveText('1.1500');
+  await expectInsideBounds(page);
+  // The fighters have not moved sideways: the frame widened around the same midpoint.
+  await expect(readout(page, 'midpoint')).toHaveText('48000');
+  await expect(readout(page, 'target-left')).toHaveText('6261');
+  await expect(readout(page, 'target-right')).toHaveText('89739');
+
+  // Landed (frame 40) and converged: exactly the frame-0 framing again.
+  await button(page, 'Play').click();
+  await expect(readout(page, 'scale')).toHaveText('1.3714', { timeout: 20_000 });
+  await expect(readout(page, 'left')).toHaveText('13000', { timeout: 20_000 });
+  await button(page, 'Pause').click();
+  await expect(readout(page, 'right')).toHaveText('83000');
+  expect(await number(page, 'frame')).toBeGreaterThan(40);
+});
+
 test('a shake trigger shows on Step, decays to 0 after its duration and is cleared by Reset', async ({
   page,
 }, testInfo) => {

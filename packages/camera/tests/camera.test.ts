@@ -126,6 +126,108 @@ describe('framing', () => {
   });
 });
 
+describe('headroom', () => {
+  const scenario = (id: string) => {
+    const found = MOVEMENT_SCENARIOS.find((s) => s.id === id);
+    if (!found) throw new Error(`No movement scenario ${id}`);
+    return found;
+  };
+  const widthOf = (view: View) => span(view).right - span(view).left;
+  /** The point `headroom` above every fighter is not above the viewport top. */
+  function expectHeadroom(view: View, state: SimulationState, config: CameraConfig = CONFIG) {
+    for (const fighter of state.fighters) {
+      expect(worldToScreen(view, fighter.x, fighter.y + config.headroom).y).toBeGreaterThanOrEqual(
+        -SLACK,
+      );
+    }
+  }
+  /** Player 1 jumps on the first frame; both fighters start at `x0` and `x1`. */
+  const jump = (x0: number, x1: number, config = CONFIG) =>
+    film(scenario('neutral-jump').inputs, 60, place(x0, x1), config);
+
+  it.each(['neutral-jump', 'forward-jump'])(
+    'keeps the headroom above both fighters in the pre-shake view on every frame of %s',
+    (id) => {
+      const { inputs, frames } = scenario(id);
+      const shots = film(inputs, frames);
+      // 200 world units up at the apex, and 230 are visible above the ground at the closest zoom.
+      expect(Math.max(...shots.map(({ state }) => state.fighters[0].y))).toBeGreaterThan(15_000);
+      for (const { state, output } of shots) {
+        expectHeadroom(output.steady, state);
+        expectFramed(output.steady, state);
+        expectWithinBounds(output.view);
+        // The ground line does not move.
+        expect(output.steady.originY).toBe(CONFIG.viewport.height - CONFIG.groundMargin);
+      }
+    },
+  );
+
+  it('zooms out past the closest zoom during a jump and rests on the grounded target again', () => {
+    const shots = jump(40_000, 46_000);
+    const widths = shots.map(({ output }) => widthOf(output.steady));
+    expect(widths[0]).toBe(CONFIG.minVisibleWidth);
+    // Apex 20000 + headroom 20000 at the top of the 460 px above the ground line.
+    expect(Math.max(...widths)).toBeCloseTo((40_000 * 960) / 460, 6);
+    // 23000 sub-units are visible above the ground at the closest zoom: higher than 3000, the
+    // headroom no longer fits in it.
+    const high = shots.filter(({ state }) => state.fighters[0].y > 3000);
+    expect(high.length).toBeGreaterThan(30);
+    for (const { output } of high) {
+      expect(widthOf(output.steady)).toBeGreaterThan(CONFIG.minVisibleWidth);
+    }
+
+    // Landed: the target is the grounded one at once, and the view comes to rest exactly on it.
+    const camera = createCamera(CONFIG);
+    let output = camera.update(shots[0]!.state);
+    for (const { state } of shots) output = camera.update(state);
+    const landed = shots.at(-1)!.state;
+    expect(landed.fighters[0].grounded).toBe(true);
+    expect(output).toEqual(shots.at(-1)!.output);
+    expect(output.target.right - output.target.left).toBe(CONFIG.minVisibleWidth);
+    for (let frame = landed.frame + 1; frame <= landed.frame + 120; frame++) {
+      output = camera.update({ ...landed, frame });
+    }
+    expect(output.steady).toEqual(createCamera(CONFIG).update(landed).steady);
+    expect(output.steady.scale).toBe(2);
+  });
+
+  it.each<{ name: string; config: CameraConfig; limit: number }>([
+    { name: 'maxVisibleWidth', config: { ...CONFIG, maxVisibleWidth: 60_000 }, limit: 60_000 },
+    {
+      name: 'the bounds',
+      config: { ...CONFIG, bounds: { left: 10_000, right: 70_000 } },
+      limit: 60_000,
+    },
+  ])('never shows more than $name for a jump that needs more', ({ config, limit }) => {
+    const shots = jump(40_000, 46_000, config);
+    for (const { output } of shots) {
+      expectWithinBounds(output.view, config);
+      expectWithinBounds(output.steady, config);
+      expect(widthOf(output.steady)).toBeLessThanOrEqual(limit + SLACK);
+    }
+    // The limit was reached: the fit asked for more.
+    expect(Math.max(...shots.map(({ output }) => widthOf(output.steady)))).toBeCloseTo(limit, 6);
+  });
+
+  it('films a jump twice with deeply equal outputs', () => {
+    const outputs = () => jump(40_000, 46_000).map(({ output }) => output);
+    expect(outputs()).toEqual(outputs());
+  });
+
+  it('snaps to a view with the headroom on a seek into the middle of a jump', () => {
+    const shots = jump(40_000, 46_000);
+    const apex = shots.reduce((a, b) => (b.state.fighters[0].y > a.state.fighters[0].y ? b : a));
+    expect(apex.state.frame).toBeGreaterThan(15);
+    const camera = createCamera(CONFIG);
+    camera.update(shots[0]!.state);
+    const output = camera.update(apex.state);
+    expect(output).toEqual(createCamera(CONFIG).update(apex.state));
+    expectHeadroom(output.steady, apex.state);
+    expectFramed(output.steady, apex.state);
+    expect(widthOf(output.steady)).toBeGreaterThan(CONFIG.minVisibleWidth);
+  });
+});
+
 describe('visual bounds', () => {
   const narrow: CameraConfig = { ...CONFIG, bounds: { left: 20_000, right: 50_000 } };
   const tight: CameraConfig = { ...CONFIG, bounds: { left: 0, right: 96_000 } };
@@ -354,11 +456,13 @@ describe('configuration', () => {
       createCamera({
         ...CONFIG,
         minVisibleWidth: 200_000,
+        headroom: -1,
         smoothing: 0,
         shake: { land: { amplitude: 4, frames: 0 } },
       }),
     ).toThrow(
       'Invalid camera config: minVisibleWidth: must be > 0 and at most maxVisibleWidth; ' +
+        'headroom: must be >= 0; ' +
         'smoothing: must be in (0, 1]; ' +
         'shake.land: amplitude must be >= 0 and frames a positive integer',
     );
