@@ -8,20 +8,21 @@ Commands are listed in the [README](../README.md#commands). This page covers wor
 - Default ports: game 5173, Studio 5174. Both use `strictPort`: if the port is taken, Vite exits
   with an error instead of silently moving. Override per run:
   `pnpm dev:game --port 6100` (arguments pass through to Vite).
-- Stop with Ctrl+C in the terminal that started them. See the Windows cleanup debt below.
+- Stop with Ctrl+C in the terminal that started them.
+- **Windows note.** A kill does not propagate down the process tree on Windows, so the root dev
+  scripts run through `scripts/dev.ts`. It watches the `pnpm` run that started it (the script
+  shell, `pnpm` and its shims) and, when one of those processes is killed from Task Manager,
+  `taskkill` or a job runner, ends the whole tree within a few seconds, `node … vite` included.
+  This covers the root scripts only: an app's own `pnpm dev`, or a kill of the launcher process
+  alone, still leaves its children running. On Linux the launcher only passes the command and
+  SIGTERM through.
 - `pnpm test:e2e` never reuses a running dev server; it starts and stops its own on free ports.
+  Orch's checks never run `pnpm dev`, and agents doing browser verification use Playwright specs
+  rather than background dev servers.
 
 ## Known technical debt
 
-- **Windows dev-server cleanup.** Killing only the parent `pnpm` process (from Task Manager or
-  a background-job runner, rather than Ctrl+C in its console) leaves the `vite` children running
-  on Windows, because the kill does not propagate to the process tree. Workaround: stop dev
-  servers with Ctrl+C, or end the leftover `node … vite` processes. Orch's checks never run
-  `pnpm dev`: they are `pnpm install`, `pnpm check` and `pnpm test:e2e`, whose Vite servers
-  Playwright starts and tears down itself (verified to leave no processes on Windows). Agents
-  doing browser verification should therefore use Playwright specs, not background
-  `pnpm dev`. If unattended runs ever need dev servers, fix this first, e.g. with a small
-  cross-platform launcher that kills the process tree.
+None recorded.
 
 ## Adding a workspace package
 
