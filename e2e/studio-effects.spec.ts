@@ -41,6 +41,8 @@ test('fire, re-feed, pause and step, restore, expire and reset', async ({ page }
   // Paused, so nothing expires while the counts are checked.
   await button(page, 'Pause').click();
   await expect(button(page, 'Step')).toBeEnabled();
+  // The toggle is the same element after its label changes, so keyboard focus stays on it.
+  await expect(button(page, 'Resume')).toBeFocused();
   await button(page, 'Fire land (P1)').click();
   await expect(readout(page, 'count')).toHaveText('1');
   await expect(readout(page, 'frame')).toHaveText('1');

@@ -157,9 +157,15 @@ export function EffectsLab() {
 
   const buttonClass =
     'rounded bg-neutral-800 px-3 py-1 text-sm hover:bg-neutral-700 disabled:opacity-40';
-  const button = (label: string, onClick: (actions: Actions) => void, enabled = true) => (
+  // `key` stays stable when a label toggles (Pause/Resume) so the button keeps keyboard focus.
+  const button = (
+    label: string,
+    onClick: (actions: Actions) => void,
+    enabled = true,
+    key = label,
+  ) => (
     <button
-      key={label}
+      key={key}
       type="button"
       className={buttonClass}
       disabled={!ready || !enabled}
@@ -188,10 +194,15 @@ export function EffectsLab() {
       <div className="flex flex-wrap items-center gap-2">
         {button('Re-feed last batch', (actions) => actions.refeed())}
         {button('Restore frame 0', (actions) => actions.restore())}
-        {button(paused ? 'Resume' : 'Pause', (actions) => {
-          actions.setPaused(!paused);
-          setPaused(!paused);
-        })}
+        {button(
+          paused ? 'Resume' : 'Pause',
+          (actions) => {
+            actions.setPaused(!paused);
+            setPaused(!paused);
+          },
+          true,
+          'pause',
+        )}
         {button('Step', (actions) => actions.step(), paused)}
         {button('Reset', (actions) => {
           actions.reset();
@@ -235,7 +246,11 @@ export function EffectsLab() {
         every effect. Effects age by display time only, so Pause freezes them and Step advances one
         display step ({TICK_MS.toFixed(1)} ms).
       </p>
-      {error && <p className="text-red-400">Effects failed: {error}</p>}
+      {error && (
+        <p role="alert" className="text-red-400">
+          Effects failed: {error}
+        </p>
+      )}
     </section>
   );
 }
