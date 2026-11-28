@@ -67,6 +67,15 @@ test('integration lab is listed under Analysis and loads the seeded fixture', as
   // Paused at frame 0: Step runs exactly one tick.
   await button(page, 'Step').click();
   await expect(readout(page, 'frame')).toHaveText('1');
+
+  // Leaving unmounts the lab; coming back builds one new session from the fixture.
+  const labs = page.getByRole('navigation', { name: 'Labs' });
+  await labs.getByRole('link', { name: 'Simulation Lab' }).click();
+  await expect(page.getByRole('heading', { name: 'Integration Lab' })).toHaveCount(0);
+  await labs.getByRole('link', { name: 'Integration Lab' }).click();
+  await expect(button(page, 'Play')).toBeEnabled({ timeout: 30_000 });
+  await expectFixture(page);
+  await expect(page.getByTestId('arena').locator('canvas')).toHaveCount(1);
   expect(errors).toEqual([]);
 });
 
@@ -110,6 +119,9 @@ test('a recorded session replays to the same final frame, hash, effects and cues
   await page.keyboard.down('KeyD');
   await button(page, 'Record').click();
   await expect(readout(page, 'mode')).toHaveText('recording');
+  // The same button is now Stop and keeps keyboard focus; Reset would discard the recording.
+  await expect(button(page, 'Stop')).toBeFocused();
+  await expect(button(page, 'Reset')).toBeDisabled();
   await expect.poll(numberOf(page, 'frame')).toBeGreaterThan(60);
   await page.keyboard.down('KeyW');
   await expect(readout(page, 'cue-log')).toContainText('jump → jump');
@@ -118,6 +130,8 @@ test('a recorded session replays to the same final frame, hash, effects and cues
   await expect(readout(page, 'cue-log')).toContainText('land → land');
   await button(page, 'Stop').click();
   await expect(readout(page, 'mode')).toHaveText('live');
+  await expect(button(page, 'Record')).toBeFocused();
+  await expect(button(page, 'Reset')).toBeEnabled();
   await expect(readout(page, 'recorded-hash')).toHaveText(/^[0-9a-f]{8}$/);
 
   // Stopped: the readouts hold still on the recording's last frame.
@@ -136,6 +150,7 @@ test('a recorded session replays to the same final frame, hash, effects and cues
   await expect(readout(page, 'frame')).toHaveText(recorded.frame);
 
   await button(page, 'Play replay').click();
+  await expect(button(page, 'Play replay')).toBeFocused();
   await expect(readout(page, 'played-frame')).toHaveText(recorded.frame, { timeout: 30_000 });
   await expect(readout(page, 'played-hash')).toHaveText(recorded.hash);
   await expect(readout(page, 'mode')).toHaveText('playback');
@@ -147,4 +162,16 @@ test('a recorded session replays to the same final frame, hash, effects and cues
   await expect(readout(page, 'cue-log')).toHaveText(recorded.cueLog);
   // The recording is kept, unchanged, next to the playback result.
   await expect(readout(page, 'recorded-hash')).toHaveText(recorded.hash);
+
+  // A finished playback cannot continue: Play starts it over and it ends on the same frame.
+  await button(page, 'Play').click();
+  await expect(button(page, 'Pause')).toBeFocused();
+  await expect(readout(page, 'played-frame')).toHaveText(recorded.frame, { timeout: 30_000 });
+  await expect(readout(page, 'played-hash')).toHaveText(recorded.hash);
+  await expect(readout(page, 'cues')).toHaveText(recorded.cues);
+  // So does Step, paused on frame 1.
+  await button(page, 'Step').click();
+  await expect(readout(page, 'frame')).toHaveText('1');
+  await expect(readout(page, 'played-frame')).toHaveText('—');
+  await expect(button(page, 'Step')).toBeFocused();
 });

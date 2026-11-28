@@ -165,9 +165,26 @@ export function IntegrationLab() {
         };
         restart();
 
+        const replayFromStart = () => {
+          session.playReplay();
+          restart();
+        };
+        // A finished (or desynced) playback cannot continue: Play and Step start it over.
+        const ended = () =>
+          session.mode === 'playback' && (session.played !== null || session.desync !== null);
+
         actionsRef.current = {
-          togglePause: () => session.setPaused(!session.paused),
-          step: () => void pending.push(...session.step()),
+          togglePause() {
+            if (ended()) replayFromStart();
+            else session.setPaused(!session.paused);
+          },
+          step() {
+            if (ended()) {
+              replayFromStart();
+              session.setPaused(true);
+            }
+            pending.push(...session.step());
+          },
           reset() {
             session.reset();
             restart();
@@ -177,10 +194,7 @@ export function IntegrationLab() {
             restart();
           },
           stop: () => session.stop(),
-          playReplay() {
-            session.playReplay();
-            restart();
-          },
+          playReplay: replayFromStart,
         };
 
         const readouts = new Map(
@@ -332,11 +346,13 @@ export function IntegrationLab() {
         </span>
       </header>
       <div className="flex flex-wrap items-center gap-2">
-        {button('Reset', true, (actions) => actions.reset())}
+        {button('Reset', !recording, (actions) => actions.reset())}
         {button(paused ? 'Play' : 'Pause', true, (actions) => actions.togglePause())}
         {button('Step', paused, (actions) => actions.step())}
-        {button('Record', !recording, (actions) => actions.record())}
-        {button('Stop', recording, (actions) => actions.stop())}
+        {/* One button, so keyboard focus stays on it when it changes from Record to Stop. */}
+        {button(recording ? 'Stop' : 'Record', true, (actions) =>
+          recording ? actions.stop() : actions.record(),
+        )}
         {button('Play replay', hasReplay, (actions) => actions.playReplay())}
       </div>
       {alert && (
@@ -356,6 +372,7 @@ export function IntegrationLab() {
         Diagnostics (world values in sub-units, 100 per world unit)
       </h2>
       <dl
+        role="group"
         aria-labelledby="integration-diagnostics"
         className="grid w-fit grid-cols-[auto_auto_auto_auto] gap-x-4 font-mono text-xs text-neutral-400"
       >
@@ -385,6 +402,7 @@ export function IntegrationLab() {
         player keeps 64; newest {CUE_LINES} shown)
       </h2>
       <pre
+        role="region"
         aria-labelledby="integration-cues"
         data-testid="integration-cue-log"
         data-readout="cue-log"
@@ -396,9 +414,11 @@ export function IntegrationLab() {
         by the skeletal renderer, the camera, the placeholder arena, and effects and audio driven by
         simulation events. Player 1: A / D or ← → to walk, W or ↑ to jump, S or ↓ to crouch, U I O J
         K L for buttons. Player 2: numpad 4 / 6 / 8 / 5 and digits 1 to 6, or the first gamepad.
-        Reset returns to the seeded fixture, paused at frame 0. Record restarts from the fixture and
-        records live input; Stop keeps the recording; Play replay re-simulates it from frame 0 and
-        must end on the recorded frame and hash. Audio plays after the first key or pointer press.
+        Reset returns to the seeded fixture, paused at frame 0. Record restarts from the fixture,
+        discards any earlier recording and records live input (Reset is unavailable meanwhile); Stop
+        keeps the recording; Play replay re-simulates it from frame 0 and must end on the recorded
+        frame and hash. After a playback has ended, Play and Step start it again from frame 0. Audio
+        plays after the first key or pointer press.
       </p>
       {error && (
         <p role="alert" className="text-red-400">

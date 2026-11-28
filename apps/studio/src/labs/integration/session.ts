@@ -110,7 +110,7 @@ export function fighterActivity(fighter: FighterState): FighterActivity {
  * frame while walking, the raised staff in the air, a squash while crouching, the rest pose
  * otherwise. A function of the snapshot only. Not an animation state machine.
  */
-export function fighterPose(fighter: FighterState, frame: number): AnimatedPose {
+function fighterPose(fighter: FighterState, frame: number): AnimatedPose {
   switch (fighterActivity(fighter)) {
     case 'walk':
       return sample(WALK, frame);
