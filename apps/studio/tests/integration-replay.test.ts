@@ -13,7 +13,7 @@ import { PRESENTATION, SEED } from '@mortal-doctrine/match-view/testing';
 import { createReplayPlayer } from '@mortal-doctrine/replay';
 import type { SimulationState } from '@mortal-doctrine/simulation';
 import { expect, it } from 'vitest';
-import { createSession, replayTicks, scriptedInputs } from '../src/labs/integration/session';
+import { createSession, scriptedInputs } from '../src/labs/integration/session';
 
 // 25 simulated seconds: longer than the effects and audio dedupe windows (600 frames).
 const FRAMES = 1500;
@@ -110,8 +110,8 @@ it('a recorded session replays with the same camera, effects, cues and poses', (
   expect(playback.cues).toEqual(live.cues);
   expect(playback.poses).toEqual(live.poses);
 
-  // A seek back inside the dedupe windows, then re-simulation into the same presentation: the
-  // cleared effects come back once each and no cue plays again.
+  // A seek back inside the dedupe windows, then the player's own ticks into the same
+  // presentation: the cleared effects come back once each and no cue plays again.
   const replay = session.replay;
   if (!replay) throw new Error('the session kept no recording');
   const back = FRAMES - DEDUPE_WINDOW_FRAMES / 2;
@@ -120,7 +120,8 @@ it('a recorded session replays with the same camera, effects, cues and poses', (
   const sources = playback.context.sources.length;
   playback.present(player.state, []);
   expect(playback.active()).toEqual([]);
-  const again = replayTicks(replay, player.state, FRAMES - back);
+  const again: Tick[] = [];
+  for (let tick = player.stepOnce(); tick; tick = player.stepOnce()) again.push(tick);
   expect(again).toHaveLength(FRAMES - back);
   for (const tick of again) playback.present(tick.state, [tick]);
   const expected = live.spawned.slice(back).flat();

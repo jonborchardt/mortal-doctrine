@@ -33,7 +33,10 @@ function deepFreeze<T>(value: T): T {
   return value;
 }
 
-/** Records `ticks` single steps of `script`; also returns the live serialized state per frame. */
+/**
+ * Records `ticks` single steps of `script`; also returns the live serialized state per frame and
+ * the events each live tick emitted.
+ */
 function record(ticks: number, script: InputProvider = walkCycleScript, checksumInterval = 60) {
   const runner = createSimulationRunner(SEEDED_OPTIONS);
   const recorder = createReplayRecorder({
@@ -43,11 +46,12 @@ function record(ticks: number, script: InputProvider = walkCycleScript, checksum
   });
   const provider = recorder.provider(script);
   const live = [serializeState(runner.state)];
+  const events: (readonly SimulationEvent[])[] = [];
   for (let i = 0; i < ticks; i++) {
-    runner.stepOnce(provider);
+    events.push(runner.stepOnce(provider));
     live.push(serializeState(runner.state));
   }
-  return { replay: deepFreeze(recorder.finish()), live };
+  return { replay: deepFreeze(recorder.finish()), live, events };
 }
 
 /** A JSON copy of `replay` with one tick's inputs replaced. */
@@ -73,8 +77,9 @@ function asJson(replay: Replay) {
 describe('record and play back', () => {
   let replay: Replay;
   let live: string[];
+  let events: (readonly SimulationEvent[])[];
   beforeAll(() => {
-    ({ replay, live } = record(MATCH_TICKS));
+    ({ replay, live, events } = record(MATCH_TICKS));
   });
 
   it('reproduces a 99 second session byte for byte at every checksum frame', () => {
@@ -87,31 +92,79 @@ describe('record and play back', () => {
     expect(player.frame).toBe(0);
     expect(player.length).toBe(MATCH_TICKS);
     for (const { frame } of replay.checksums) {
-      while (player.frame < frame) expect(player.stepOnce()).toBe(true);
+      while (player.frame < frame) {
+        const result = player.stepOnce();
+        expect(result?.state).toBe(player.state);
+      }
       expect(serializeState(player.state)).toBe(live[frame]);
     }
     expect(player.frame).toBe(MATCH_TICKS);
     expect(serializeState(player.state)).toBe(live[MATCH_TICKS]);
     expect(player.desync).toBeNull();
-    expect(player.stepOnce()).toBe(false);
+    expect(player.stepOnce()).toBeNull();
     expect(player.frame).toBe(MATCH_TICKS);
+  });
+
+  it('hands out the events the live run emitted, tick by tick', () => {
+    const player = createReplayPlayer(replay);
+    for (let frame = 0; frame < MATCH_TICKS; frame++) {
+      const result = player.stepOnce();
+      expect(result?.events).toEqual(events[frame]);
+      for (const event of result?.events ?? []) expect(event.frame).toBe(frame);
+    }
+    // Not vacuous: the walk cycle emits events.
+    expect(events.filter((tick) => tick.length > 0).length).toBeGreaterThan(0);
+  });
+
+  it('hands out the same ticks however playback is paced, after seeking back and forth', () => {
+    const FROM = 1000;
+    const reference = createReplayPlayer(replay);
+    reference.seek(FROM);
+    const expected: { frame: number; events: readonly SimulationEvent[] }[] = [];
+    for (let result = reference.stepOnce(); result; result = reference.stepOnce())
+      expected.push({ frame: result.state.frame - 1, events: result.events });
+
+    for (const elapsedMs of [TICK_MS / 3, TICK_MS, TICK_MS * 2.5, 1000]) {
+      const player = createReplayPlayer(replay);
+      player.seek(3000);
+      player.seek(500);
+      player.seek(FROM);
+      player.play();
+      const played: typeof expected = [];
+      while (!player.paused) {
+        for (const result of player.advance(elapsedMs))
+          played.push({ frame: result.state.frame - 1, events: result.events });
+      }
+      expect(player.frame).toBe(MATCH_TICKS);
+      expect(played).toEqual(expected);
+    }
+  });
+
+  it('seeks without handing out events, forwards and backwards', () => {
+    const player = createReplayPlayer(replay);
+    expect(player.seek(2000)).toBeUndefined();
+    expect(player.seek(100)).toBeUndefined();
+    expect(player.frame).toBe(100);
+    // The next tick played is the one after the seek target, with that frame's live events.
+    expect(player.stepOnce()?.events).toEqual(events[100]);
   });
 
   it('plays in whole 60 Hz ticks, only while playing, and stops at the end', () => {
     const player = createReplayPlayer(replay);
-    expect(player.advance(1000)).toBe(0);
+    expect(player.advance(1000)).toEqual([]);
     player.play();
     expect(player.paused).toBe(false);
-    expect(player.advance(TICK_MS * 3)).toBe(3);
-    expect(player.advance(TICK_MS / 2)).toBe(0);
-    expect(player.advance(TICK_MS / 2)).toBe(1);
+    expect(player.advance(TICK_MS * 3).length).toBe(3);
+    expect(player.advance(TICK_MS / 2).length).toBe(0);
+    const [last] = player.advance(TICK_MS / 2);
+    expect(last?.state).toBe(player.state);
     expect(serializeState(player.state)).toBe(live[4]);
     player.pause();
-    expect(player.advance(1000)).toBe(0);
+    expect(player.advance(1000)).toEqual([]);
 
     player.seek(MATCH_TICKS - 2);
     player.play();
-    expect(player.advance(TICK_MS * 10)).toBe(2);
+    expect(player.advance(TICK_MS * 10).length).toBe(2);
     expect(player.frame).toBe(MATCH_TICKS);
     expect(player.paused).toBe(true);
     expect(player.desync).toBeNull();
@@ -214,8 +267,8 @@ describe('recorder', () => {
     expect(replay.checksums.map((checksum) => checksum.frame)).toEqual([0]);
     const player = createReplayPlayer(deserializeReplay(serializeReplay(replay)));
     player.play();
-    expect(player.advance(1000)).toBe(0);
-    expect(player.stepOnce()).toBe(false);
+    expect(player.advance(1000)).toEqual([]);
+    expect(player.stepOnce()).toBeNull();
     player.seek(0);
     expect(player.desync).toBeNull();
     expect(serializeState(player.state)).toBe(serializeState(createInitialState(SEEDED_OPTIONS)));
@@ -353,7 +406,7 @@ describe('a session with command definitions', () => {
     for (let frame = 0; frame <= TICKS; frame++) {
       expect(player.frame).toBe(frame);
       expect(serializeState(player.state)).toBe(live[frame]);
-      expect(player.stepOnce()).toBe(frame < TICKS);
+      expect(player.stepOnce() !== null).toBe(frame < TICKS);
     }
     expect(player.desync).toBeNull();
   });
@@ -364,7 +417,7 @@ describe('a session with command definitions', () => {
       player.seek(frame);
       expect(serializeState(player.state)).toBe(live[frame]);
       for (let next = frame + 1; next <= Math.min(frame + 20, TICKS); next++) {
-        expect(player.stepOnce()).toBe(true);
+        expect(player.stepOnce()).not.toBeNull();
         expect(serializeState(player.state)).toBe(live[next]);
       }
       expect(player.desync).toBeNull();
@@ -452,8 +505,8 @@ describe('tamper detection', () => {
     // Nothing moves past the desync frame.
     player.play();
     expect(player.paused).toBe(true);
-    expect(player.advance(1000)).toBe(0);
-    expect(player.stepOnce()).toBe(false);
+    expect(player.advance(1000)).toEqual([]);
+    expect(player.stepOnce()).toBeNull();
     player.seek(300);
     expect(player.frame).toBe(frame);
 

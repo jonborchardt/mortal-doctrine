@@ -1,5 +1,10 @@
 import { TICK_MS } from '@mortal-doctrine/sim-core';
-import { createInitialState, step, type SimulationState } from '@mortal-doctrine/simulation';
+import {
+  createInitialState,
+  step,
+  type SimulationState,
+  type StepResult,
+} from '@mortal-doctrine/simulation';
 import type { Replay } from './format';
 import { digestInputs, EMPTY_INPUTS_DIGEST, formatHash, hashState } from './hash';
 
@@ -33,11 +38,17 @@ export interface ReplayPlayer {
   /** No effect at the end of the replay or at a desync. */
   play(): void;
   pause(): void;
-  /** Feeds elapsed host time; runs whole ticks unless paused. Returns the ticks run. */
-  advance(elapsedMs: number): number;
-  /** Runs one tick regardless of pause state. Returns false at the end or at a desync. */
-  stepOnce(): boolean;
-  /** Re-simulates to `frame` (an integer in 0..length), stopping early at a desync. */
+  /**
+   * Feeds elapsed host time; runs whole ticks unless paused. Returns each tick's `step` result,
+   * oldest first (empty while paused or when no whole tick accrued).
+   */
+  advance(elapsedMs: number): readonly StepResult[];
+  /** Runs one tick regardless of pause state. Returns its `step` result, null at the end or at a desync. */
+  stepOnce(): StepResult | null;
+  /**
+   * Re-simulates to `frame` (an integer in 0..length), stopping early at a desync. A seek is a
+   * jump, not playback: it hands out no events.
+   */
   seek(frame: number): void;
 }
 
@@ -76,13 +87,14 @@ export function createReplayPlayer(replay: Replay): ReplayPlayer {
     verify();
   };
 
-  const tick = (): boolean => {
+  const tick = (): StepResult | null => {
     const inputs = replay.inputs[state.frame];
-    if (desync || !inputs) return false;
-    state = step(state, inputs).state;
+    if (desync || !inputs) return null;
+    const result = step(state, inputs);
+    state = result.state;
     digest = digestInputs(digest, inputs);
     verify();
-    return true;
+    return result;
   };
 
   rewind();
@@ -106,12 +118,13 @@ export function createReplayPlayer(replay: Replay): ReplayPlayer {
     },
     pause,
     advance(elapsedMs) {
-      if (paused) return 0;
+      if (paused) return [];
       accumulatedMs = Math.min(accumulatedMs + elapsedMs, MAX_CATCH_UP_MS);
-      let ticks = 0;
-      while (accumulatedMs + EPSILON_MS >= TICK_MS && tick()) {
+      const ticks: StepResult[] = [];
+      let result: StepResult | null;
+      while (accumulatedMs + EPSILON_MS >= TICK_MS && (result = tick())) {
         accumulatedMs -= TICK_MS;
-        ticks++;
+        ticks.push(result);
       }
       if (desync || state.frame === length) pause();
       return ticks;
