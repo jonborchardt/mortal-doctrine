@@ -59,6 +59,33 @@ expected.
   TypeScript (small test fixtures excepted).
 - Replacing art must not require engine changes.
 
+## Arena presentation data
+
+**(implemented: `parseArena` in `@mortal-doctrine/arena`)**
+
+```json
+{
+  "schemaVersion": 1,
+  "id": "placeholder",
+  "groundLine": 10000,
+  "visualBounds": { "left": -4000, "right": 100000 },
+  "layers": [
+    { "id": "sky", "parallax": 0, "images": [{ "texture": "sky", "x": -4000, "y": 0 }] },
+    { "id": "ground", "parallax": 1, "images": [{ "texture": "ground", "x": -4000, "y": 0 }] }
+  ]
+}
+```
+
+- Coordinates are integer world sub-units, +x right, +y up. `groundLine` is the authored y drawn
+  at gameplay y = 0.
+- `visualBounds` is the world x the camera may show; its centre is the parallax reference.
+- `layers` are back to front with unique kebab-case ids. `parallax` is in [0, 1]: 1 moves with
+  the gameplay plane, 0 is fixed on screen; horizontal only.
+- An image names a texture id of the arena's asset manifest; `(x, y)` is its bottom-left corner.
+  Its size is the texture's logical size, 1 logical px = 1 world unit (a 192×64 px `@2x` file
+  covers 9600×3200 sub-units). Images are never flipped, stretched or tiled.
+- This is presentation data only: gameplay bounds are arena rules in simulation state.
+
 ## Asset manifests
 
 **(implemented: `loadTextureManifest` / `parseTextureManifest` in `@mortal-doctrine/renderer`)**

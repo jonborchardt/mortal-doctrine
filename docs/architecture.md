@@ -26,14 +26,14 @@ future milestones, not yet built). Decision records live in [decisions/](decisio
 
 ## Layers — Implemented (enforced)
 
-| #   | Layer          | Contains                                                        | Today                                              |
-| --- | -------------- | --------------------------------------------------------------- | -------------------------------------------------- |
-| 1   | `foundation`   | math primitives, narrowly scoped shared contracts               | `sim-core`, `math`                                 |
-| 2   | `simulation`   | headless gameplay: state, stepping, movement, collision, combat | `simulation`, `commands`, `movement`, `replay`     |
-| 3   | `animation`    | presentation-independent skeleton and animation evaluation      | `rig`, `animation`                                 |
-| 4   | `presentation` | rendering, effects, camera, audio, browser device adapters      | `renderer`, `skeleton-renderer`, `input`, `camera` |
-| 5   | `content`      | `characters/*`, `arenas/*`                                      | —                                                  |
-| 6   | `application`  | `apps/*` composition and tooling                                | `game`, `studio`                                   |
+| #   | Layer          | Contains                                                        | Today                                                       |
+| --- | -------------- | --------------------------------------------------------------- | ----------------------------------------------------------- |
+| 1   | `foundation`   | math primitives, narrowly scoped shared contracts               | `sim-core`, `math`                                          |
+| 2   | `simulation`   | headless gameplay: state, stepping, movement, collision, combat | `simulation`, `commands`, `movement`, `replay`              |
+| 3   | `animation`    | presentation-independent skeleton and animation evaluation      | `rig`, `animation`                                          |
+| 4   | `presentation` | rendering, effects, camera, audio, browser device adapters      | `renderer`, `skeleton-renderer`, `input`, `camera`, `arena` |
+| 5   | `content`      | `characters/*`, `arenas/*`                                      | —                                                           |
+| 6   | `application`  | `apps/*` composition and tooling                                | `game`, `studio`                                            |
 
 A package declares its layer in `package.json`:
 
@@ -306,6 +306,14 @@ frame number only (never a clock): the same frame again changes nothing, a backw
 seek snaps and clears the shake, so equal snapshot and event sequences give equal views. It is
 not wired into `apps/game` yet. See the package README.
 
+**Arena (implemented, `@mortal-doctrine/arena`).** `parseArena` validates `schemaVersion: 1`
+arena presentation data (layers with parallax factors, ground line, visual bounds, images naming
+manifest texture ids); `createArenaRenderable` is a registered renderable that draws the layers
+back to front in one renderer layer, shifting each horizontally by its factor for the frame's
+`View` (Pixi-free rule: `parallaxToScreen`). It owns the textures it is given. Gameplay bounds
+stay in `movement`; no arena content package exists and it is not wired into `apps/game` yet.
+See the package README.
+
 The 960×540 viewport and the 2× texture resolution are **defaults, not architectural
 constraints**. No code may assume the logical viewport equals the arena width.
 
@@ -328,12 +336,12 @@ deformation is not.
 Each lab is a folder `apps/studio/src/labs/<id>/` with a `lab.ts` exporting a typed
 `LabDefinition`; discovery is automatic (`import.meta.glob`). Every lab has the stable URL
 `/labs/<id>`. The Simulation, Input, Command, Movement, Replay, Skeleton, Animation, Pose
-Constraints and Camera Labs exist. See [development.md](development.md#adding-a-studio-lab).
+Constraints, Camera and Arena Labs exist. See [development.md](development.md#adding-a-studio-lab).
 
 ## Deferred functionality (explicit non-goals of M0)
 
 Combat, hitboxes, combos, special moves, skeletal animation, characters,
 arenas, effects, audio, AI, menus, settings, persistence, networking, rollback.
 (The seeded RNG, simulation events, gamepad input, replays, opt-in render interpolation,
-movement with jumping and pushbox collision, skeletal animation and the camera now exist;
+movement with jumping and pushbox collision, skeletal animation, the camera and the arena parallax engine (placeholder fixture only) now exist;
 see above.)

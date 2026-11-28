@@ -52,6 +52,9 @@ Every simulation-layer subsystem must show:
 - Camera fixtures (`@mortal-doctrine/camera/testing`): `FIXTURE_CAMERA_CONFIG`, a placeholder
   960×540 framing whose visual bounds reach 4000 sub-units beyond each wall of the default arena,
   with `land` and `wall-contact` shakes.
+- Arena fixtures (`@mortal-doctrine/arena/testing`): `PLACEHOLDER_ARENA`, four flat-colour layers
+  (parallax 0, 0.25, 0.5, 1) with a non-zero ground line over the camera fixture's visual bounds;
+  its textures and manifest are the Studio fixture `apps/studio/public/fixtures/arena/`.
 - Keep fixtures small, readable and built from public APIs. Before production characters exist,
   use geometric placeholders and reference mannequins (future: a minimal test rig in the skeleton
   package), never production content.
