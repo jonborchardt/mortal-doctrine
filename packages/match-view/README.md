@@ -13,21 +13,21 @@ placeholder match (mannequins, placeholder arena, tone cues) is the `./testing` 
 **Non-goals:** owning the simulation runner, input capture or the audio player (the app creates
 them); recording, playback, pause and step (Integration Lab); an animation state machine (the
 pose function is the caller's); HUD; content. It adds no options for the open engine gaps
-(#220 to #223, #225): their workarounds live here once, as they were in the lab.
+(#220 to #223): their workarounds live here once, as they were in the lab.
 
 ## API
 
-| Export                                                            | Meaning                                                                                                                                              |
-| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `createTickSource(getState, inputs)`                              | Splits a runner batch into ticks. Give `source.inputs` to the runner; `source.run(() => runner.advance(ms, source.inputs).events)` returns `Tick[]`. |
-| `Tick`                                                            | `{ state, events }`: the snapshot after one tick and the events it emitted (an event's `frame` is the frame its tick started from).                  |
-| `createPresenter({ camera, initial, pose, audio, draw })`         | One timeline's presentation. `present(state, ticks)` returns the camera output.                                                                      |
-| `DrawFrame`                                                       | What `draw` receives: `{ state, events, view, poses }`, with the events of every tick since the previous draw.                                       |
-| `mountMatchStage(host, options)`                                  | Builds the Pixi stage in `host`. Returns `{ ready, dispose }` at once; `ready` resolves to the `MatchStage`, or `undefined` when disposed first.     |
-| `MatchStage`                                                      | `{ renderer, effects, draw }`. `draw(frame)` sets the view and both fighters' poses, then renders. Pass it to `createPresenter`.                     |
-| `SEED`, `SESSION_OPTIONS`, `ARENA`, `CAMERA_CONFIG` (`./testing`) | The placeholder match: seeded initial-state options with the generic commands, the parsed placeholder arena, the camera config bounded by it (#225). |
-| `fighterActivity`, `fighterPose` (`./testing`)                    | Placeholder movement-state names (`idle`, `walk`, `crouch`, `air`) and the state-to-clip pose mapping.                                               |
-| `PRESENTATION`, `STAGE`, `toneAudio(context)` (`./testing`)       | Ready-made options for `createPresenter` (add `audio`, `draw`), `mountMatchStage`, and `createAudioPlayer` (add `gestureTarget`).                    |
+| Export                                                            | Meaning                                                                                                                                                                                 |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createTickSource(getState, inputs)`                              | Splits a runner batch into ticks. Give `source.inputs` to the runner; `source.run(() => runner.advance(ms, source.inputs).events)` returns `Tick[]`.                                    |
+| `Tick`                                                            | `{ state, events }`: the snapshot after one tick and the events it emitted (an event's `frame` is the frame its tick started from).                                                     |
+| `createPresenter({ camera, initial, pose, audio, draw })`         | One timeline's presentation. `present(state, ticks)` returns the camera output.                                                                                                         |
+| `DrawFrame`                                                       | What `draw` receives: `{ state, events, view, poses }`, with the events of every tick since the previous draw.                                                                          |
+| `mountMatchStage(host, options)`                                  | Builds the Pixi stage in `host`. Returns `{ ready, dispose }` at once; `ready` resolves to the `MatchStage`, or `undefined` when disposed first.                                        |
+| `MatchStage`                                                      | `{ renderer, effects, draw }`. `draw(frame)` sets the view and both fighters' poses, then renders. Pass it to `createPresenter`.                                                        |
+| `SEED`, `SESSION_OPTIONS`, `ARENA`, `CAMERA_CONFIG` (`./testing`) | The placeholder match: seeded initial-state options with the generic commands, the parsed placeholder arena, the camera config bounded by it, with headroom for the airborne mannequin. |
+| `fighterActivity`, `fighterPose` (`./testing`)                    | Placeholder movement-state names (`idle`, `walk`, `crouch`, `air`) and the state-to-clip pose mapping.                                                                                  |
+| `PRESENTATION`, `STAGE`, `toneAudio(context)` (`./testing`)       | Ready-made options for `createPresenter` (add `audio`, `draw`), `mountMatchStage`, and `createAudioPlayer` (add `gestureTarget`).                                                       |
 
 ## Rules
 

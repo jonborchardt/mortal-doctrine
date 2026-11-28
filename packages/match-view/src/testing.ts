@@ -26,15 +26,15 @@ export const SESSION_OPTIONS = {
 
 export const ARENA = parseArena(PLACEHOLDER_ARENA);
 /**
- * The arena supplies the camera's visual bounds. The closest zoom is wider than the camera
- * fixture's: the camera does not track vertically, and at the fixture's 2 px per world unit a
- * jumping mannequin (head 365 world units up at the apex) leaves the top of the frame
- * (ticket #225). At 80000 sub-units across, 383 world units above the ground are visible.
+ * The arena supplies the camera's visual bounds. The headroom covers the airborne mannequin
+ * pose: the raised hand (`grip-right`) is 199 world units above the feet
+ * (`tests/headroom.test.ts`) and the 56-unit staff sprite, held 45° from upright, ends about
+ * 238 above them.
  */
 export const CAMERA_CONFIG: CameraConfig = {
   ...FIXTURE_CAMERA_CONFIG,
   bounds: ARENA.visualBounds,
-  minVisibleWidth: 80_000,
+  headroom: 25_000,
 };
 
 const WALK = loadClip(WALK_CYCLE);

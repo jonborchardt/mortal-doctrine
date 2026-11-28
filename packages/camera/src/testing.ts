@@ -5,7 +5,8 @@ import type { CameraConfig } from './camera';
 /**
  * 960×540 viewport over the default 96000-wide gameplay arena, with visual bounds 4000
  * sub-units beyond each wall. Visible width 48000 (2 px per world unit) to 104000, which is the
- * whole bounds. `land` and `wall-contact` shake; `jump` and `command` do not.
+ * whole bounds. Headroom 200 world units: at the closest zoom 230 are visible above the ground, so
+ * grounded framing never depends on it. `land` and `wall-contact` shake; `jump` and `command` do not.
  */
 export const FIXTURE_CAMERA_CONFIG: CameraConfig = {
   viewport: { width: 960, height: 540 },
@@ -13,6 +14,7 @@ export const FIXTURE_CAMERA_CONFIG: CameraConfig = {
   minVisibleWidth: 48_000,
   maxVisibleWidth: 104_000,
   margin: 8000,
+  headroom: 20_000,
   groundMargin: 80,
   smoothing: 0.15,
   shake: {

@@ -64,7 +64,7 @@ composed session from its production package. A gap names the ticket that closes
 | Skeletal animation (M1.08)              | done   | Fixture clips sampled per snapshot. The state-to-clip mapping is lab-local placeholder  |
 | IK and pose constraints (M1.09)         | done   | Not part of the composition; covered by its own lab and tests                           |
 | Skeletal rendering (M1.10)              | gap    | Draws both mannequins. Two renderables cannot share a manifest #222                     |
-| Camera (M1.11)                          | gap    | Frames both fighters. A jump leaves the frame at the fixture's closest zoom #225        |
+| Camera (M1.11)                          | done   | Frames both fighters; zooms out to keep a jumping fighter in frame (headroom)           |
 | Arena and parallax (M1.12)              | gap    | Placeholder arena drawn through the camera. No production arena package #226            |
 | Visual effects (M1.13)                  | done   | Spawned once per event, live and in playback                                            |
 | Audio (M1.14)                           | gap    | Cues trigger once per event. No reset for a restarted timeline #221                     |
@@ -86,13 +86,12 @@ Gaps, as orch tickets (`orch ticket show <id>`):
   hands one mannequin a non-releasing copy of the other's textures.
 - **#223** Host loop: support a camera view before render and a replay player as the state
   source. The lab cannot use `startHostLoop` and owns its renderer and frame callback.
-- **#225** Camera: keep a jumping fighter in frame. The lab limits the closest zoom instead.
 - **#226** Arena content: a production arena package checked against its gameplay rules.
 - **#219** Animation Lab: draw with the Pixi skeletal renderer (deferred from M1.18).
 - **#216** (filed earlier) Replay: sessions created with `movement` or `arena` options cannot
   be recorded, so the lab's session uses the default movement parameters and arena.
 
-M2 combat work on the simulation side is not blocked by any of these. #220, #222 and #225 should
+M2 combat work on the simulation side is not blocked by any of these. #220 and #222 should
 land before the M2 sandbox draws hits on two mannequins. The game screen already runs the
 composition (#224, `@mortal-doctrine/match-view`), with the placeholder fixture until #226.
 

@@ -303,11 +303,12 @@ re-trigger sounds. Playback unlocks on the first user gesture. See the package R
 
 **Camera (implemented, `@mortal-doctrine/camera`).** `createCamera(config).update(state, events)`
 returns the `View` a host passes to `setView` before `render`. It frames both fighters
-horizontally between configured zoom limits, never shows world x outside the caller-supplied
-visual bounds, and adds a decaying shake for configured event types. It advances by snapshot
-frame number only (never a clock): the same frame again changes nothing, a backwards frame or a
-seek snaps and clears the shake, so equal snapshot and event sequences give equal views. The
-game and the Integration Lab drive it through `match-view`. See the package README.
+horizontally between configured zoom limits, zooms out (the ground line never moves) so that a
+configured headroom above a jumping fighter stays in frame, never shows world x outside the
+caller-supplied visual bounds, and adds a decaying shake for configured event types. It advances
+by snapshot frame number only (never a clock): the same frame again changes nothing, a backwards
+frame or a seek snaps and clears the shake, so equal snapshot and event sequences give equal
+views. The game and the Integration Lab drive it through `match-view`. See the package README.
 
 **Arena (implemented, `@mortal-doctrine/arena`).** `parseArena` validates `schemaVersion: 1`
 arena presentation data (layers with parallax factors, ground line, visual bounds, images naming
