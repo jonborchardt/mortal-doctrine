@@ -83,7 +83,6 @@ GitHub Actions runs `pnpm check` and `pnpm test:e2e` on Ubuntu and Windows with 
 lockfile; Playwright reports and traces are uploaded on failure. Headless Chromium uses
 SwiftShader for WebGL (`--enable-unsafe-swiftshader`).
 
-A failure trace carries DOM snapshots, the action log, console, network and a final screenshot,
-but no screencast: the labs redraw their canvas every frame, so recording one made every worker
-read back, encode and write frames continuously and starved slow runners. For a film strip, rerun
-the failing spec locally with `--trace on`.
+Failure traces keep DOM snapshots, the action log, console, network and a final screenshot, but
+no screencast (its per-frame readbacks loaded slow runners); rerun with `--trace on` for a film
+strip.
