@@ -471,6 +471,9 @@ importers:
 
   packages/replay:
     dependencies:
+      '@mortal-doctrine/commands':
+        specifier: workspace:*
+        version: link:../commands
       '@mortal-doctrine/sim-core':
         specifier: workspace:*
         version: link:../sim-core

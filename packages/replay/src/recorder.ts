@@ -1,3 +1,4 @@
+import { parseCommandList } from '@mortal-doctrine/commands';
 import { parseFrameInputs, type FrameInputs } from '@mortal-doctrine/sim-core';
 import {
   createInitialState,
@@ -42,6 +43,8 @@ export function createReplayRecorder(config: ReplayRecorderConfig): ReplayRecord
   const options = {
     seed: config.options?.seed ?? 0,
     historyCapacity: config.options?.historyCapacity ?? DEFAULT_HISTORY_CAPACITY,
+    // A validated copy, so the replay does not alias the caller's definitions.
+    commands: parseCommandList(config.options?.commands ?? []),
   };
   if (serializeState(getState()) !== serializeState(createInitialState(options))) {
     throw new Error('Replay recording must start from createInitialState(options)');
