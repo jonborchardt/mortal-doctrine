@@ -9,13 +9,9 @@ Commands are listed in the [README](../README.md#commands). This page covers wor
   with an error instead of silently moving. Override per run:
   `pnpm dev:game --port 6100` (arguments pass through to Vite).
 - Stop with Ctrl+C in the terminal that started them.
-- **Windows note.** A kill does not propagate down the process tree on Windows, so the root dev
-  scripts run through `scripts/dev.ts`. It watches the `pnpm` run that started it (the script
-  shell, `pnpm` and its shims) and, when one of those processes is killed from Task Manager,
-  `taskkill` or a job runner, ends the whole tree within a few seconds, `node … vite` included.
-  This covers the root scripts only: an app's own `pnpm dev`, or a kill of the launcher process
-  alone, still leaves its children running. On Linux the launcher only passes the command and
-  SIGTERM through.
+- **Windows note.** The root dev scripts run through `scripts/dev.ts`, which ends the whole `pnpm`
+  process tree on Windows when the `pnpm` run is killed (Task Manager, `taskkill`, a job runner).
+  It does not cover an app's own `pnpm dev` or a kill of the launcher process alone.
 - `pnpm test:e2e` never reuses a running dev server; it starts and stops its own on free ports.
   Orch's checks never run `pnpm dev`, and agents doing browser verification use Playwright specs
   rather than background dev servers.
