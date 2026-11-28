@@ -119,6 +119,16 @@ Character APIs do not exist yet (M2–M3). The fixed parts:
   walk through production `step`; the production camera frames them. Play/Pause, Step, Reset and
   one visibility toggle per arena layer; readouts show the frame, the visible span and the
   fighters' midpoint.
+- The Integration Lab (`/labs/integration`) composes every M1 system from its production
+  package, starting paused at frame 0 of a seeded fixture: live device capture, `step` with the
+  generic commands, two mannequin rigs posed by a placeholder state-to-clip mapping and drawn by
+  the skeletal renderer, the camera, `PLACEHOLDER_ARENA`, and effects and audio driven by
+  simulation events. Reset, Play/Pause, Step, Record, Stop and Play replay; readouts show the
+  frame, seed, mode, each fighter's x, y and state, active and spawned effects, triggered audio
+  cues, the visible span, the final frame and state hash of the recording and of its playback,
+  render FPS, tick rate, frame CPU time and simulation update time. Its composition
+  (`apps/studio/src/labs/integration/session.ts`) also runs headless in the Studio's Node tests,
+  including a soak of ten simulated minutes (`apps/studio/tests/integration-soak.test.ts`).
 - Diagnostics are measured by the host app around simulation calls; the simulation itself never
   reads clocks.
 - `pnpm bench` runs headless Vitest benchmarks (`tests/*.bench.ts`). Compare results only on the
@@ -136,3 +146,24 @@ Intel i7-4930K (2013 desktop), Windows 10, Node 24.19, Chromium via Playwright:
 Caveats: Vitest's module runner adds per-call overhead to cross-module imports (it prints a
 warning) so the benchmark overstates real cost; browser numbers are from a headed dev build with
 vsync and say nothing about lower-end hardware.
+
+### M1 integration (2026-11-27, Integration Lab)
+
+Same machine and toolchain as the baseline (Intel i7-4930K, Windows 10, Node 24.19, Chromium via
+Playwright, headed dev build with vsync). The baseline above is unchanged, for comparison.
+
+| Measurement                                                 | Result                                           |
+| ----------------------------------------------------------- | ------------------------------------------------ |
+| Integration Lab, live play, both fighters walking, jumping  | 60 FPS, 60 ticks/s                               |
+| Frame CPU (`renderer.frameCpuMs`), ten samples 1 s apart    | 0.8 to 2.3 ms, median 1.5 ms (baseline ≈ 0.3 ms) |
+| Simulation update per display frame, same samples           | 0.1 to 0.5 ms, mostly 0.1 ms                     |
+| Integration soak test: 36,037 frames, simulated three times | 5 to 7 s of test time                            |
+
+Frame CPU is about five times the hello-world baseline and under 15% of the 16.7 ms frame
+budget. The frame now holds the arena layers, two skeletal renderables, 3 to 6 active effects,
+the camera, audio triggers and about twenty DOM readouts. Caveats: each sample is one display
+frame's value read once a second while a script held the keys, not an average; the browser
+coarsens `performance.now()` to 0.1 ms, so the simulation figure is at the resolution limit;
+GPU time is not included; replay playback steps every tick twice (ticket #220), so its
+simulation time is about double; the soak time includes a state hash per tick, which costs more
+than the tick itself. One desktop's numbers say nothing about lower-end hardware.
