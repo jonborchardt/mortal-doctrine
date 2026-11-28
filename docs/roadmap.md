@@ -67,7 +67,7 @@ composed session from its production package. A gap names the ticket that closes
 | Camera (M1.11)                          | done   | Frames both fighters; zooms out to keep a jumping fighter in frame (headroom)           |
 | Arena and parallax (M1.12)              | gap    | Placeholder arena drawn through the camera. No production arena package #226            |
 | Visual effects (M1.13)                  | done   | Spawned once per event, live and in playback                                            |
-| Audio (M1.14)                           | gap    | Cues trigger once per event. No reset for a restarted timeline #221                     |
+| Audio (M1.14)                           | done   | Cues trigger once per event; `clear()` restarts a timeline on one player                |
 | Replay (M1.15)                          | gap    | Records and replays without desync; the player returns each tick's events. Options #216 |
 | Mesh deformation and skinning (M1.16)   | done   | Not part of the composition; covered by the Skeleton Lab                                |
 | Arena consistency (gameplay vs. visual) | done   | `integration-arena.test.ts`, for the placeholder arena only (#226)                      |
@@ -78,8 +78,6 @@ composed session from its production package. A gap names the ticket that closes
 
 Gaps, as orch tickets (`orch ticket show <id>`):
 
-- **#221** Audio player: explicit reset of the dedupe memory for a restarted timeline. The lab
-  creates a new player and `AudioContext` per timeline.
 - **#222** Texture manifests: share one loaded manifest between several renderables. The lab
   hands one mannequin a non-releasing copy of the other's textures.
 - **#223** Host loop: support a camera view before render and a replay player as the state
