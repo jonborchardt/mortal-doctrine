@@ -4,9 +4,11 @@
 
 Plays declarative keyframed clips on rigs: validates clip data, samples a clip at a time into a
 pose for `@mortal-doctrine/rig`, blends two poses by a weight, and runs an ordered list of pose
-stages, one of which applies pose constraints (two-bone IK, aim, angle limits). Pure and headless: no DOM, Pixi, React or Node APIs. Nothing here knows a bone name.
+stages, one of which applies pose constraints (two-bone IK, aim, angle limits), and skins mesh
+attachments by weighted bones. Pure and headless: no DOM, Pixi, React or Node APIs. Nothing here knows a bone name.
 
-**Non-goals:** multi-bone IK solvers (FABRIK, CCD), physics and springs, skinning (M1.16), Pixi drawing (M1.10), state machines,
+**Non-goals:** multi-bone IK solvers (FABRIK, CCD), physics and springs, GPU or dual-quaternion
+skinning, mesh keys in clips, a mesh file format on disk, Pixi drawing (M1.10), state machines,
 clip queues, additive layers, masks, named easing presets, a clip file format on disk, validating
 a clip against a rig at load time, animation-driven gameplay events.
 
@@ -33,8 +35,15 @@ math: never feed them into simulation state.
 | `AnimatedPose`                             | Rig `Pose` plus optional `drawOrder` (slot ids, back to front)                                   |
 | `Clip`, `Key`, `Interpolation`             | Runtime types (radians)                                                                          |
 | `Constraints`                              | Runtime type of a constraint list (radians)                                                      |
+| `meshDataSchema`, `MeshData`               | Zod schema and authored type of a mesh attachment, `schemaVersion: 1`                            |
+| `MESH_SCHEMA_VERSION`                      | The supported mesh `schemaVersion` (`1`)                                                         |
+| `loadMesh(rig, data)`                      | Validates `MeshData` against a rig and returns a runtime `Mesh`; throws listing problems         |
+| `skin(mesh, bones)`                        | Deformed rig-space vertex positions for `evaluate(rig, pose).bones`                              |
+| `MAX_INFLUENCES`, `WEIGHT_TOLERANCE`       | `4` bones per vertex; weights must sum to 1 within `1e-6`                                        |
+| `Mesh`                                     | Runtime mesh type, bound to the rig it was loaded for                                            |
 | `@mortal-doctrine/animation/testing`       | `WALK_CYCLE`, `RAISE_STAFF` (mannequin), `WING_FLAP` (non-humanoid), `INVALID_CLIPS`, `SMOOTH`   |
 | `@mortal-doctrine/animation/testing`       | Constraints: `MANNEQUIN_REACH` (mannequin), `OFFSET_CHAIN_RIG`, `INVALID_CONSTRAINTS`            |
+| `@mortal-doctrine/animation/testing`       | Meshes: `LIMB_RIG` (two bones), `LIMB_MESH` (quad strip across the joint), `INVALID_MESHES`      |
 
 ## Clip data
 
@@ -155,6 +164,38 @@ pipeline passes it.
   above them is handled. Targets are fixed points: no bone or anchor targets, and clips cannot
   key a mix.
 
+## Meshes and skinning
+
+A mesh is its own plain data, bound to one rig attachment. Rig data is unchanged.
+
+```ts
+{
+  schemaVersion: 1,
+  attachment: 'limb-skin',
+  vertices: [
+    // Rig space at the rig's rest pose (world units, y-up): the rest pose is the bind pose.
+    { position: { x: 0, y: 110 }, uv: { x: 0.5, y: 0 },
+      weights: [{ bone: 'upper', weight: 0.5 }, { bone: 'lower', weight: 0.5 }] },
+    ...
+  ],
+  triangles: [[0, 1, 2], ...],  // vertex indices
+}
+```
+
+`loadMesh(rig, data)` rejects, naming the vertex, triangle, bone or attachment: an unknown
+`schemaVersion`; a missing or mistyped field; an attachment the rig does not have; a weight
+naming a bone the rig does not have, or one whose rest world transform is not invertible (a zero
+rest scale on it or above it); a bone named twice in one vertex; more than `MAX_INFLUENCES` (4)
+weights; a weight `<= 0`; weights whose sum is more than `WEIGHT_TOLERANCE` (`1e-6`) from 1; a
+vertex with no weights; a UV outside [0, 1]; a triangle index that is not an integer vertex index;
+a triangle repeating an index; fewer than 3 vertices; no triangles. It precomputes, per weight,
+the vertex in the bone's rest space (`inverse(boneWorld(rest)) · v`).
+
+`skin(mesh, evaluate(rig, pose).bones)` is linear blend skinning: each vertex is
+`Σ weight · boneWorld(pose) · inverse(boneWorld(rest)) · v`, in rig space (world units, y-up). At
+the rest pose every vertex is at its authored position. It is pure and throws for bones of another
+rig. `@mortal-doctrine/skeleton-renderer` draws the result.
+
 ## Usage
 
 ```ts
@@ -187,4 +228,5 @@ orderSlots(slots, pose.drawOrder).map((slot) => slot.id); // ['held-right', 'bod
 - **Consumes** `Rig`, `Pose` and `evaluate` from `@mortal-doctrine/rig` (unchanged).
 - **Consumers today:** the Studio Animation Lab (`/labs/animation`) and Pose Constraints Lab
   (`/labs/pose-constraints`).
+- **Consumers of meshes:** `@mortal-doctrine/skeleton-renderer` and the Skeleton Lab (`Mesh limb`).
 - **Later:** M1.10 draws `orderSlots(...)` output with Pixi.

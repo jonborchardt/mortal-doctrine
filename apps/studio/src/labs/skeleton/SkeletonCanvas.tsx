@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { Mesh } from '@mortal-doctrine/animation';
 import {
   createArenaRenderer,
   loadTextureManifest,
@@ -22,13 +23,18 @@ const CHARACTER_ORIGIN = { x: 0, y: 0 } as const;
 // The renderer's frame carries a simulation snapshot; nothing here reads it.
 const STATE = createInitialState();
 
-/** The production skeletal renderable drawing `rig` at `pose`, in its own Pixi canvas. */
+/**
+ * The production skeletal renderable drawing `rig` (with `meshes`, loaded for it) at `pose`, in
+ * its own Pixi canvas. Keep `meshes` stable per rig: a new list rebuilds the renderable.
+ */
 export function SkeletonCanvas({
   rig,
+  meshes,
   pose,
   facing,
 }: {
   readonly rig: Rig;
+  readonly meshes: readonly Mesh[];
   readonly pose: Pose;
   readonly facing: Facing;
 }) {
@@ -81,7 +87,12 @@ export function SkeletonCanvas({
       .then(async () => {
         if (cancelled) return;
         const textures = await loadTextureManifest(MANIFEST);
-        const renderable = createSkeletonRenderable({ rig, layer: 'fighters', textures });
+        const renderable = createSkeletonRenderable({
+          rig,
+          layer: 'fighters',
+          textures,
+          meshes,
+        });
         if (cancelled) return renderable.destroy();
         renderable.setPose(latest.current.pose, latest.current.facing, CHARACTER_ORIGIN);
         renderableRef.current = renderable;
@@ -97,7 +108,7 @@ export function SkeletonCanvas({
       renderableRef.current = undefined;
       unregister();
     };
-  }, [renderer, rig]);
+  }, [renderer, rig, meshes]);
 
   return (
     <div className="w-[36rem] max-w-full">
