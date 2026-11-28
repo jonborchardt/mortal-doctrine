@@ -221,12 +221,15 @@ importers:
 
   apps/game:
     dependencies:
+      '@mortal-doctrine/audio':
+        specifier: workspace:*
+        version: link:../../packages/audio
       '@mortal-doctrine/input':
         specifier: workspace:*
         version: link:../../packages/input
-      '@mortal-doctrine/renderer':
+      '@mortal-doctrine/match-view':
         specifier: workspace:*
-        version: link:../../packages/renderer
+        version: link:../../packages/match-view
       '@mortal-doctrine/sim-core':
         specifier: workspace:*
         version: link:../../packages/sim-core
@@ -282,6 +285,9 @@ importers:
       '@mortal-doctrine/input':
         specifier: workspace:*
         version: link:../../packages/input
+      '@mortal-doctrine/match-view':
+        specifier: workspace:*
+        version: link:../../packages/match-view
       '@mortal-doctrine/math':
         specifier: workspace:*
         version: link:../../packages/math
@@ -446,6 +452,49 @@ importers:
         specifier: workspace:*
         version: link:../sim-core
     devDependencies:
+      vitest:
+        specifier: ^5.1.2
+        version: 5.1.2(@types/node@24.19.4)(vite@8.3.8(@types/node@24.19.4)(jiti@2.7.0))
+
+  packages/match-view:
+    dependencies:
+      '@mortal-doctrine/animation':
+        specifier: workspace:*
+        version: link:../animation
+      '@mortal-doctrine/arena':
+        specifier: workspace:*
+        version: link:../arena
+      '@mortal-doctrine/audio':
+        specifier: workspace:*
+        version: link:../audio
+      '@mortal-doctrine/camera':
+        specifier: workspace:*
+        version: link:../camera
+      '@mortal-doctrine/commands':
+        specifier: workspace:*
+        version: link:../commands
+      '@mortal-doctrine/effects':
+        specifier: workspace:*
+        version: link:../effects
+      '@mortal-doctrine/movement':
+        specifier: workspace:*
+        version: link:../movement
+      '@mortal-doctrine/renderer':
+        specifier: workspace:*
+        version: link:../renderer
+      '@mortal-doctrine/rig':
+        specifier: workspace:*
+        version: link:../rig
+      '@mortal-doctrine/simulation':
+        specifier: workspace:*
+        version: link:../simulation
+      '@mortal-doctrine/skeleton-renderer':
+        specifier: workspace:*
+        version: link:../skeleton-renderer
+    devDependencies:
+      '@mortal-doctrine/sim-core':
+        specifier: workspace:*
+        version: link:../sim-core
       vitest:
         specifier: ^5.1.2
         version: 5.1.2(@types/node@24.19.4)(vite@8.3.8(@types/node@24.19.4)(jiti@2.7.0))

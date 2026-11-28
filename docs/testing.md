@@ -33,7 +33,9 @@ Every simulation-layer subsystem must show:
 ## Fixtures
 
 - Packages publish reusable fixtures from `src/testing.ts`, exported as
-  `@mortal-doctrine/<pkg>/testing`. Production code never imports `testing`.
+  `@mortal-doctrine/<pkg>/testing`. Production code never imports `testing`. One exception:
+  `apps/game/src/match.ts` imports `@mortal-doctrine/match-view/testing` (the placeholder match)
+  until content packages exist (#226).
 - Simulation fixtures today: `held(...bits)` (builds an `InputFrame`), `IDLE`, `P1_RIGHT`,
   `P1_LEFT`, `SEEDED_OPTIONS` (non-default seed and history capacity), `walkCycleScript` (an
   `InputProvider` mapping absolute frame → `FrameInputs`; left/right only) and

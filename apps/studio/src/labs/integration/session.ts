@@ -1,16 +1,9 @@
-// The Integration Lab's composition, without React, DOM or Pixi objects: the seeded fixture, a
-// scripted input generator, the placeholder state-to-clip mapping, the record / playback session
-// and the per-tick presentation order. The lab and the Node tests in `apps/studio/tests` both
-// run this module, so the tests exercise the composition the lab shows.
-import { loadClip, sample, type AnimatedPose } from '@mortal-doctrine/animation';
-import { RAISE_STAFF, WALK_CYCLE } from '@mortal-doctrine/animation/testing';
-import { parseArena } from '@mortal-doctrine/arena';
-import { PLACEHOLDER_ARENA } from '@mortal-doctrine/arena/testing';
-import { createCamera, type CameraConfig, type CameraOutput } from '@mortal-doctrine/camera';
-import { FIXTURE_CAMERA_CONFIG } from '@mortal-doctrine/camera/testing';
-import { GENERIC_COMMANDS } from '@mortal-doctrine/commands/testing';
-import type { FighterState } from '@mortal-doctrine/movement';
-import type { View } from '@mortal-doctrine/renderer';
+// The Integration Lab's session, without React, DOM or Pixi objects: a scripted input generator
+// and the record / playback session. The presentation order, the stage and the placeholder
+// fixture are `@mortal-doctrine/match-view`. The lab and the Node tests in `apps/studio/tests`
+// both run this module, so the tests exercise the session the lab shows.
+import { createTickSource, type Tick } from '@mortal-doctrine/match-view';
+import { SESSION_OPTIONS } from '@mortal-doctrine/match-view/testing';
 import {
   createReplayPlayer,
   createReplayRecorder,
@@ -22,35 +15,12 @@ import {
 } from '@mortal-doctrine/replay';
 import { InputBit, type InputFrame } from '@mortal-doctrine/sim-core';
 import {
-  createInitialState,
   createSimulationRunner,
   step,
-  type InitialStateOptions,
   type InputProvider,
-  type SimulationEvent,
   type SimulationRunner,
   type SimulationState,
 } from '@mortal-doctrine/simulation';
-
-/** The fixture every session starts from and Reset returns to. */
-export const SEED = 1_180_199;
-export const SESSION_OPTIONS = {
-  seed: SEED,
-  commands: GENERIC_COMMANDS,
-} as const satisfies InitialStateOptions;
-
-export const ARENA = parseArena(PLACEHOLDER_ARENA);
-/**
- * The arena supplies the camera's visual bounds. The closest zoom is wider than the camera
- * fixture's: the camera does not track vertically, and at the fixture's 2 px per world unit a
- * jumping mannequin (head 365 world units up at the apex) leaves the top of the frame
- * (ticket #225). At 80000 sub-units across, 383 world units above the ground are visible.
- */
-export const CAMERA_CONFIG: CameraConfig = {
-  ...FIXTURE_CAMERA_CONFIG,
-  bounds: ARENA.visualBounds,
-  minVisibleWidth: 80_000,
-};
 
 const { LEFT, RIGHT, UP, DOWN, A1, A2 } = InputBit;
 const SEGMENT_FRAMES = 12;
@@ -90,43 +60,6 @@ export function scriptedInputs(seed: number): InputProvider {
     return typeof action === 'function' ? action(frame % SEGMENT_FRAMES) : action;
   };
   return (frame) => [player(0, frame), player(1, frame)];
-}
-
-const WALK = loadClip(WALK_CYCLE);
-const RAISE = loadClip(RAISE_STAFF);
-const REST: AnimatedPose = {};
-const CROUCH: AnimatedPose = { bones: { root: { scale: { x: 1, y: 0.6 } } } };
-
-type FighterActivity = 'idle' | 'walk' | 'crouch' | 'air';
-
-export function fighterActivity(fighter: FighterState): FighterActivity {
-  if (!fighter.grounded) return 'air';
-  if (fighter.crouching) return 'crouch';
-  return fighter.vx === 0 ? 'idle' : 'walk';
-}
-
-/**
- * Placeholder mapping from movement state to a mannequin pose: the walk cycle on the simulation
- * frame while walking, the raised staff in the air, a squash while crouching, the rest pose
- * otherwise. A function of the snapshot only. Not an animation state machine.
- */
-function fighterPose(fighter: FighterState, frame: number): AnimatedPose {
-  switch (fighterActivity(fighter)) {
-    case 'walk':
-      return sample(WALK, frame);
-    case 'air':
-      return sample(RAISE, RAISE.duration);
-    case 'crouch':
-      return CROUCH;
-    case 'idle':
-      return REST;
-  }
-}
-
-/** One simulation tick: the snapshot after it and the events it emitted. */
-export interface Tick {
-  readonly state: SimulationState;
-  readonly events: readonly SimulationEvent[];
 }
 
 /**
@@ -188,12 +121,8 @@ export function createSession(inputs: InputProvider): Session {
   let player: ReplayPlayer | null = null;
   let played: FinalFrame | null = null;
 
-  // The runner returns one batch of events; the snapshot before each tick is caught here.
-  const before: SimulationState[] = [];
-  const sampled: InputProvider = (frame) => {
-    before.push(runner.state);
-    return inputs(frame);
-  };
+  const live = createTickSource(() => runner.state, inputs);
+  const sampled = live.inputs;
   let provider = sampled;
   const start = (record: boolean) => {
     runner = createSimulationRunner(SESSION_OPTIONS);
@@ -211,15 +140,6 @@ export function createSession(inputs: InputProvider): Session {
     hash: hashState(state),
   });
 
-  const live = (run: () => readonly SimulationEvent[]): Tick[] => {
-    before.length = 0;
-    const events = run();
-    // An event's frame is the frame its tick started from.
-    return before.map((previous, index) => ({
-      state: before[index + 1] ?? runner.state,
-      events: events.filter((event) => event.frame === previous.frame),
-    }));
-  };
   const playback = (current: ReplayPlayer, run: () => number): Tick[] => {
     const from = current.state;
     const ticks = replay ? replayTicks(replay, from, run()) : [];
@@ -260,13 +180,13 @@ export function createSession(inputs: InputProvider): Session {
       const current = player;
       return current
         ? playback(current, () => current.advance(elapsedMs))
-        : live(() => runner.advance(elapsedMs, provider).events);
+        : live.run(() => runner.advance(elapsedMs, provider).events);
     },
     step() {
       const current = player;
       return current
         ? playback(current, () => Number(current.stepOnce()))
-        : live(() => runner.stepOnce(provider));
+        : live.run(() => runner.stepOnce(provider));
     },
     record: () => start(true),
     stop() {
@@ -288,52 +208,6 @@ export function createSession(inputs: InputProvider): Session {
     reset() {
       start(false);
       runner.pause();
-    },
-  };
-}
-
-/** What the host draws for one display frame. */
-export interface DrawFrame {
-  readonly state: SimulationState;
-  /** Every event since the previous drawn frame, for the renderer's renderables (effects). */
-  readonly events: readonly SimulationEvent[];
-  readonly view: View;
-  readonly poses: readonly [AnimatedPose, AnimatedPose];
-}
-
-export interface PresenterHost {
-  /** Receives each tick's events once, in tick order. */
-  readonly audio: { play(events: readonly SimulationEvent[]): void };
-  /** Sets the view and the poses, then renders. */
-  draw(frame: DrawFrame): void;
-}
-
-/**
- * The presentation order for one timeline (create a new one when the session restarts): the
- * camera and audio consume every tick, then the snapshot is drawn once through the camera's
- * view. Feeding the camera per tick keeps its output independent of display pacing.
- */
-export function createPresenter(host: PresenterHost) {
-  const camera = createCamera(CAMERA_CONFIG);
-  // Every timeline starts at the fixture: the camera rests there before the first tick, so its
-  // path does not depend on which snapshot happens to be drawn first.
-  camera.update(createInitialState(SESSION_OPTIONS));
-  return {
-    present(state: SimulationState, ticks: readonly Tick[]): CameraOutput {
-      for (const tick of ticks) {
-        camera.update(tick.state, tick.events);
-        host.audio.play(tick.events);
-      }
-      // The same frame again returns the camera's last output.
-      const output = camera.update(state);
-      const [p1, p2] = state.fighters;
-      host.draw({
-        state,
-        events: ticks.flatMap((tick) => tick.events),
-        view: output.view,
-        poses: [fighterPose(p1, state.frame), fighterPose(p2, state.frame)],
-      });
-      return output;
     },
   };
 }

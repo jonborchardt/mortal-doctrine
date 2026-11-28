@@ -26,14 +26,14 @@ future milestones, not yet built). Decision records live in [decisions/](decisio
 
 ## Layers — Implemented (enforced)
 
-| #   | Layer          | Contains                                                        | Today                                                                  |
-| --- | -------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| 1   | `foundation`   | math primitives, narrowly scoped shared contracts               | `sim-core`, `math`                                                     |
-| 2   | `simulation`   | headless gameplay: state, stepping, movement, collision, combat | `simulation`, `commands`, `movement`, `replay`                         |
-| 3   | `animation`    | presentation-independent skeleton and animation evaluation      | `rig`, `animation`                                                     |
-| 4   | `presentation` | rendering, effects, camera, audio, browser device adapters      | `renderer`, `skeleton-renderer`, `input`, `camera`, `arena`, `effects` |
-| 5   | `content`      | `characters/*`, `arenas/*`                                      | —                                                                      |
-| 6   | `application`  | `apps/*` composition and tooling                                | `game`, `studio`                                                       |
+| #   | Layer          | Contains                                                        | Today                                                                                         |
+| --- | -------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| 1   | `foundation`   | math primitives, narrowly scoped shared contracts               | `sim-core`, `math`                                                                            |
+| 2   | `simulation`   | headless gameplay: state, stepping, movement, collision, combat | `simulation`, `commands`, `movement`, `replay`                                                |
+| 3   | `animation`    | presentation-independent skeleton and animation evaluation      | `rig`, `animation`                                                                            |
+| 4   | `presentation` | rendering, effects, camera, audio, browser device adapters      | `renderer`, `skeleton-renderer`, `input`, `camera`, `arena`, `effects`, `audio`, `match-view` |
+| 5   | `content`      | `characters/*`, `arenas/*`                                      | —                                                                                             |
+| 6   | `application`  | `apps/*` composition and tooling                                | `game`, `studio`                                                                              |
 
 A package declares its layer in `package.json`:
 
@@ -284,8 +284,9 @@ and never mutates simulation state. Other presentation packages extend it withou
   a `destroy` hook. The placeholder floor and fighters are registered renderables.
 - **Textures:** `loadTextureManifest` validates a `schemaVersion: 1` manifest with Zod and loads
   textures through Pixi `Assets` at a per-call resolution (default 2×), with a release function.
-- **Host loop:** `startHostLoop` owns renderer + runner + frame subscription for the game and
-  the Simulation Lab (the Replay, Command and Input Labs keep their own setup).
+- **Host loop:** `startHostLoop` owns renderer + runner + frame subscription for the Simulation
+  Lab (the Replay, Command and Input Labs keep their own setup; the game and the Integration Lab
+  use `match-view`, see #223).
 
 `@mortal-doctrine/skeleton-renderer` is the first such package: a registered renderable that
 draws a rig with one sprite per attachment-bearing slot. The caller supplies the pose, facing and
@@ -303,16 +304,16 @@ returns the `View` a host passes to `setView` before `render`. It frames both fi
 horizontally between configured zoom limits, never shows world x outside the caller-supplied
 visual bounds, and adds a decaying shake for configured event types. It advances by snapshot
 frame number only (never a clock): the same frame again changes nothing, a backwards frame or a
-seek snaps and clears the shake, so equal snapshot and event sequences give equal views. It is
-not wired into `apps/game` yet. See the package README.
+seek snaps and clears the shake, so equal snapshot and event sequences give equal views. The
+game and the Integration Lab drive it through `match-view`. See the package README.
 
 **Arena (implemented, `@mortal-doctrine/arena`).** `parseArena` validates `schemaVersion: 1`
 arena presentation data (layers with parallax factors, ground line, visual bounds, images naming
 manifest texture ids); `createArenaRenderable` is a registered renderable that draws the layers
 back to front in one renderer layer, shifting each horizontally by its factor for the frame's
 `View` (Pixi-free rule: `parallaxToScreen`). It owns the textures it is given. Gameplay bounds
-stay in `movement`; no arena content package exists and it is not wired into `apps/game` yet.
-See the package README.
+stay in `movement`; no arena content package exists, so the game draws the placeholder arena
+through `match-view`. See the package README.
 
 **Effects (implemented, `@mortal-doctrine/effects`).** Zod-validated effect definitions
 (`core/<name>` or `<character>/<name>`; placeholder `sprite` or `particles`) and an event-type →
@@ -320,7 +321,15 @@ effect mapping drive a renderable in the `effects` layer. It spawns each event i
 the event's fighter in the drawn snapshot, ages effects only by host-supplied display time
 (`advance`) and destroys them on expiry; a backwards snapshot frame or `clear()` destroys every
 effect and forgets the spawned identities, so a re-simulation after a restore shows each effect
-once. It is not wired into `apps/game` yet. See the package README.
+once. The game and the Integration Lab mount it through `match-view`. See the package README.
+
+**Match view (implemented, `@mortal-doctrine/match-view`).** The composition `apps/game` and the
+Integration Lab share: `createTickSource` splits a runner advance into per-tick
+`{ state, events }`; `createPresenter` feeds the camera and audio every tick, then draws once
+through the camera's view; `mountMatchStage` builds the Pixi stage (renderer, arena, two
+skeletons, effects) and queues mounts so each texture manifest has one owner. It names no rig,
+arena, cue or effect: the placeholder match is its `./testing` fixture, which the game uses
+until content packages exist (#226). See the package README.
 
 The 960×540 viewport and the 2× texture resolution are **defaults, not architectural
 constraints**. No code may assume the logical viewport equals the arena width.

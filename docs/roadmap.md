@@ -74,7 +74,7 @@ composed session from its production package. A gap names the ticket that closes
 | Determinism (soak, restore)             | done   | `integration-soak.test.ts`: 36,037 frames, 24 seeded restores, equal hashes and events  |
 | Replay equality (camera, effects, cues) | done   | `integration-replay.test.ts`; in the browser, equal final frame, hash, effects and cues |
 | Frame budget                            | done   | [development.md](development.md#m1-integration-2026-11-27-integration-lab)              |
-| Game screen uses the composition        | gap    | `apps/game` still shows the placeholder fighters #224                                   |
+| Game screen uses the composition        | done   | `apps/game` and the lab share `match-view` (#224); `e2e/game.spec.ts`                   |
 
 Gaps, as orch tickets (`orch ticket show <id>`):
 
@@ -86,7 +86,6 @@ Gaps, as orch tickets (`orch ticket show <id>`):
   hands one mannequin a non-releasing copy of the other's textures.
 - **#223** Host loop: support a camera view before render and a replay player as the state
   source. The lab cannot use `startHostLoop` and owns its renderer and frame callback.
-- **#224** Game screen: wire the M1 composition into `apps/game` (deferred from M1.18).
 - **#225** Camera: keep a jumping fighter in frame. The lab limits the closest zoom instead.
 - **#226** Arena content: a production arena package checked against its gameplay rules.
 - **#219** Animation Lab: draw with the Pixi skeletal renderer (deferred from M1.18).
@@ -94,8 +93,8 @@ Gaps, as orch tickets (`orch ticket show <id>`):
   be recorded, so the lab's session uses the default movement parameters and arena.
 
 M2 combat work on the simulation side is not blocked by any of these. #220, #222 and #225 should
-land before the M2 sandbox draws hits on two mannequins, and #224 before anything is shown in
-the game.
+land before the M2 sandbox draws hits on two mannequins. The game screen already runs the
+composition (#224, `@mortal-doctrine/match-view`), with the placeholder fixture until #226.
 
 ## Architectural decisions carried into M1
 
@@ -129,5 +128,5 @@ the game.
   rendering later (#219, deferred from M1.18).
 - **Shared-file hotspots:** `packages/simulation` composition (M1.03, M1.05, M1.15 add phases or
   hooks), `apps/studio/package.json` and `pnpm-lock.yaml` (every lab; see
-  [build-system.md](build-system.md#lockfile-conflicts)), and `apps/game/src/App.tsx` (game
-  integration waits for M1.18).
+  [build-system.md](build-system.md#lockfile-conflicts)), and `apps/game/src/match.ts` (the
+  game's composition of `match-view`, since #224).

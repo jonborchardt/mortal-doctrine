@@ -8,18 +8,12 @@ import {
 import type { CameraOutput } from '@mortal-doctrine/camera';
 import { createEffectsRenderable } from '@mortal-doctrine/effects';
 import { CORE_EFFECTS, CORE_MAPPING } from '@mortal-doctrine/effects/testing';
+import { createPresenter, type DrawFrame, type Tick } from '@mortal-doctrine/match-view';
+import { PRESENTATION, SEED } from '@mortal-doctrine/match-view/testing';
 import { createReplayPlayer } from '@mortal-doctrine/replay';
 import type { SimulationState } from '@mortal-doctrine/simulation';
 import { expect, it } from 'vitest';
-import {
-  createPresenter,
-  createSession,
-  replayTicks,
-  scriptedInputs,
-  SEED,
-  type DrawFrame,
-  type Tick,
-} from '../src/labs/integration/session';
+import { createSession, replayTicks, scriptedInputs } from '../src/labs/integration/session';
 
 // 25 simulated seconds: longer than the effects and audio dedupe windows (600 frames).
 const FRAMES = 1500;
@@ -52,6 +46,7 @@ function createHeadless() {
   let lastFrame = -1;
 
   const presenter = createPresenter({
+    ...PRESENTATION,
     audio,
     draw({ state, events, view, poses: drawn }) {
       // A lower frame clears the effects, so nothing drawn before it counts as known.

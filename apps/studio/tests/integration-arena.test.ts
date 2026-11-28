@@ -6,7 +6,7 @@ import { InputBit, type FrameInputs } from '@mortal-doctrine/sim-core';
 import { createInitialState, type SimulationState } from '@mortal-doctrine/simulation';
 import { runFrames } from '@mortal-doctrine/simulation/testing';
 import { describe, expect, it } from 'vitest';
-import { ARENA, CAMERA_CONFIG, SESSION_OPTIONS } from '../src/labs/integration/session';
+import { ARENA, CAMERA_CONFIG, SESSION_OPTIONS } from '@mortal-doctrine/match-view/testing';
 
 const { LEFT, RIGHT } = InputBit;
 const INITIAL = createInitialState(SESSION_OPTIONS);
