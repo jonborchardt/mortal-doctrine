@@ -1,17 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 
 export function App() {
+  const rootRef = useRef<HTMLElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
-  const frameRef = useRef<HTMLSpanElement>(null);
-  const fpsRef = useRef<HTMLSpanElement>(null);
-  const p1Ref = useRef<HTMLSpanElement>(null);
-  const effectsRef = useRef<HTMLSpanElement>(null);
-  const cuesRef = useRef<HTMLSpanElement>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const host = hostRef.current;
-    if (!host) return;
+    const root = rootRef.current;
+    if (!host || !root) return;
     let disposed = false;
     let teardown = () => {};
     const fail = (cause: unknown) => {
@@ -24,17 +21,7 @@ export function App() {
     import('./match')
       .then(({ startMatch }) => {
         if (disposed) return;
-        teardown = startMatch(
-          host,
-          {
-            frame: frameRef.current,
-            fps: fpsRef.current,
-            p1x: p1Ref.current,
-            effects: effectsRef.current,
-            cues: cuesRef.current,
-          },
-          fail,
-        );
+        teardown = startMatch(host, root, fail);
       })
       .catch(fail);
 
@@ -45,23 +32,26 @@ export function App() {
   }, []);
 
   return (
-    <main className="flex min-h-screen flex-col items-center gap-4 bg-neutral-950 p-6 text-neutral-100">
+    <main
+      ref={rootRef}
+      className="flex min-h-screen flex-col items-center gap-4 bg-neutral-950 p-6 text-neutral-100"
+    >
       <h1 className="text-3xl font-bold tracking-widest uppercase">Mortal Doctrine</h1>
       <div className="flex gap-6 font-mono text-sm text-neutral-400">
         <span>
-          Frame <span data-testid="sim-frame" ref={frameRef} />
+          Frame <span data-testid="sim-frame" data-readout="frame" />
         </span>
         <span>
-          FPS <span data-testid="render-fps" ref={fpsRef} />
+          FPS <span data-testid="render-fps" data-readout="fps" />
         </span>
         <span>
-          P1 x <span data-testid="p1-x" ref={p1Ref} />
+          P1 x <span data-testid="p1-x" data-readout="p1-x" />
         </span>
         <span>
-          Effects <span data-testid="effects-spawned" ref={effectsRef} />
+          Effects <span data-testid="effects-spawned" data-readout="effects-spawned" />
         </span>
         <span>
-          Cues <span data-testid="audio-cues" ref={cuesRef} />
+          Cues <span data-testid="audio-cues" data-readout="audio-cues" />
         </span>
       </div>
       <div

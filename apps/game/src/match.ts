@@ -15,26 +15,25 @@ import {
 import { SUBUNITS_PER_UNIT } from '@mortal-doctrine/sim-core';
 import { createSimulationRunner } from '@mortal-doctrine/simulation';
 
-/** HUD text nodes, written directly every display frame. */
-export type Hud = Readonly<
-  Record<'frame' | 'fps' | 'p1x' | 'effects' | 'cues', HTMLElement | null>
->;
-
-function setText(element: HTMLElement | null, text: string) {
-  if (element && element.textContent !== text) element.textContent = text;
-}
-
 /**
- * Starts the match in `host`. Returns its teardown, which releases the captures, the audio
+ * Starts the match in `host`, writing the HUD into the `[data-readout]` nodes of `root` directly
+ * every display frame. Returns its teardown, which releases the captures, the audio
  * player, the frame subscription and the renderer. `onError` hears a stage that failed to load.
  */
 export function startMatch(
   host: HTMLElement,
-  hud: Hud,
+  root: HTMLElement,
   onError: (cause: unknown) => void,
 ): () => void {
   const mount = mountMatchStage(host, STAGE);
   let teardown = () => {};
+  const readouts = new Map(
+    [...root.querySelectorAll<HTMLElement>('[data-readout]')].map((el) => [el.dataset.readout, el]),
+  );
+  const write = (key: string, text: string) => {
+    const element = readouts.get(key);
+    if (element && element.textContent !== text) element.textContent = text;
+  };
 
   mount.ready
     .then((stage) => {
@@ -60,7 +59,7 @@ export function startMatch(
       // Counted as they appear: the effects list and the audio log both forget old entries.
       let activeEffects = new Set<string>();
       let effectsSpawned = 0;
-      let lastCue: TriggeredCue | undefined;
+      const countedCues = new WeakSet<TriggeredCue>();
       let cuesPlayed = 0;
 
       const unsubscribe = renderer.onFrame((elapsedMs) => {
@@ -72,16 +71,17 @@ export function startMatch(
         const keys = new Set(effects.active.map(({ key }) => key));
         for (const key of keys) if (!activeEffects.has(key)) effectsSpawned += 1;
         activeEffects = keys;
-        const { log } = audio;
-        // The log is oldest first: everything after the last cue counted is new.
-        cuesPlayed += log.length - 1 - (lastCue ? log.lastIndexOf(lastCue) : -1);
-        lastCue = log.at(-1);
+        for (const cue of audio.log) {
+          if (countedCues.has(cue)) continue;
+          countedCues.add(cue);
+          cuesPlayed += 1;
+        }
 
-        setText(hud.frame, String(state.frame));
-        setText(hud.fps, String(Math.round(renderer.fps)));
-        setText(hud.p1x, String(state.fighters[0].x / SUBUNITS_PER_UNIT));
-        setText(hud.effects, String(effectsSpawned));
-        setText(hud.cues, String(cuesPlayed));
+        write('frame', String(state.frame));
+        write('fps', String(Math.round(renderer.fps)));
+        write('p1-x', String(state.fighters[0].x / SUBUNITS_PER_UNIT));
+        write('effects-spawned', String(effectsSpawned));
+        write('audio-cues', String(cuesPlayed));
       });
 
       teardown = () => {
