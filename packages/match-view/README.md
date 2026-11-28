@@ -13,7 +13,7 @@ placeholder match (mannequins, placeholder arena, tone cues) is the `./testing` 
 **Non-goals:** owning the simulation runner, input capture or the audio player (the app creates
 them); recording, playback, pause and step (Integration Lab); an animation state machine (the
 pose function is the caller's); HUD; content. It adds no options for the open engine gaps
-(#220 to #223): their workarounds live here once, as they were in the lab.
+(#220 to #222): their workarounds live here once, as they were in the lab.
 
 ## API
 

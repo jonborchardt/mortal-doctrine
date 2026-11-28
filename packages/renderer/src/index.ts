@@ -8,4 +8,3 @@ export {
 export { blendFighterX, defaultView, worldToScreen, type View } from './view';
 export { parseTextureManifest } from './manifest';
 export { loadTextureManifest, type LoadedTextures } from './textures';
-export { startHostLoop, type HostFrame, type HostLoop, type HostLoopOptions } from './host-loop';

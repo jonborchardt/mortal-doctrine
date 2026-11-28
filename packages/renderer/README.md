@@ -1,12 +1,13 @@
 # @mortal-doctrine/renderer
 
-**Layer:** `presentation` · **May depend on:** `simulation` (read-only state types, runner,
+**Layer:** `presentation` · **May depend on:** `simulation` (read-only state types,
 `FIGHTER_WIDTH`), `sim-core` (`SUBUNITS_PER_UNIT`), lower layers, `pixi.js`, `zod`.
 
 Rendering infrastructure that other presentation packages extend without editing it: a PixiJS
 application with a configurable logical viewport, a world→screen view (the camera hook), ordered
-named layers with a renderable registration API, a manifest texture loader, optional snapshot
-interpolation, and `startHostLoop`, the one host loop shared by the game and the Simulation Lab.
+named layers with a renderable registration API, a manifest texture loader and optional snapshot
+interpolation. Hosts own the frame loop: they subscribe with `onFrame`, advance their state
+source, then call `setView` and `render`.
 The placeholder floor and fighters are ordinary registered renderables.
 
 **Non-goals:** game logic, input devices, React, mutating simulation state. Camera behaviour,
@@ -78,31 +79,9 @@ there is one texture per URL, loading a URL that a live handle holds at a differ
 rejects, naming the URL and both resolutions. After the last release a new load waits for that
 URL's pending unload and uses its own `resolution`.
 
-## Host loop
+## Frame callback and diagnostics
 
-`startHostLoop(host, { inputs, onFrame?, renderer?, runner?, interpolate? })` owns a renderer,
-a `SimulationRunner` and the display-frame subscription. Each display frame it advances the
-runner (calling `inputs` once per tick), renders (with `previous` and `runner.alpha` when
-`interpolate` is on and the runner is not paused; paused frames draw the current snapshot), then calls `onFrame({ elapsedMs, ticks, events, simMs, state })`. The
-handle exposes `ready`, `runner`, `renderer` (undefined until ready), a writable `interpolate`,
-`stepOnce()` (its events also reach renderables on the next drawn frame) and `destroy()`, which
-is safe before `ready` resolves (React StrictMode) and when repeated.
-
-```ts
-import { startHostLoop } from '@mortal-doctrine/renderer';
-
-const loop = startHostLoop(hostElement, {
-  inputs: () => [p1.sample(), p2.sample()],
-  renderer: { width: 640, height: 360 },
-  onFrame: ({ state }) => (frameLabel.textContent = String(state.frame)),
-});
-await loop.ready;
-const unregister = loop.renderer?.register(myRenderable); // e.g. layer 'effects'
-// teardown:
-loop.destroy(); // destroys every registered renderable, the Pixi app and the canvas
-```
-
-Other exports: `ArenaRenderer.onFrame(cb)` (display-frame callback, returns unsubscribe), `fps`,
+`ArenaRenderer.onFrame(cb)` (display-frame callback, returns unsubscribe), `fps`,
 `frameCpuMs` (CPU ms of the previous frame: callbacks + scene + draw submission, no GPU time),
 `destroy()`.
 
