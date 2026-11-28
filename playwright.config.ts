@@ -38,7 +38,12 @@ export default defineConfig({
   workers: Math.max(1, Math.min(3, Math.floor(availableParallelism() / 4))),
   forbidOnly: isCI,
   reporter: isCI ? [['github'], ['html', { open: 'never' }]] : 'list',
-  use: { trace: 'retain-on-failure', screenshot: 'only-on-failure' },
+  use: {
+    // No trace screencast: every lab redraws each frame, so its per-frame readbacks added to the
+    // load above on slow Windows runners (ticket 0227). Rerun with `--trace on` for a film strip.
+    trace: { mode: 'retain-on-failure', screenshots: false },
+    screenshot: 'only-on-failure',
+  },
   projects: apps.map(({ name, port }) => ({
     name,
     testMatch: `${name}*.spec.ts`,
