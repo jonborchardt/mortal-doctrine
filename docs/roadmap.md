@@ -65,12 +65,12 @@ composed session from its production package. A gap names the ticket that closes
 | IK and pose constraints (M1.09)         | done   | Not part of the composition; covered by its own lab and tests                           |
 | Skeletal rendering (M1.10)              | gap    | Draws both mannequins. Two renderables cannot share a manifest #222                     |
 | Camera (M1.11)                          | done   | Frames both fighters; zooms out to keep a jumping fighter in frame (headroom)           |
-| Arena and parallax (M1.12)              | gap    | Placeholder arena drawn through the camera. No production arena package #226            |
+| Arena and parallax (M1.12)              | gap    | Placeholder arena drawn through the camera. `arena-training-hall` not drawn yet #233    |
 | Visual effects (M1.13)                  | done   | Spawned once per event, live and in playback                                            |
 | Audio (M1.14)                           | done   | Cues trigger once per event; `clear()` restarts a timeline on one player                |
 | Replay (M1.15)                          | gap    | Records and replays without desync; the player returns each tick's events. Options #216 |
 | Mesh deformation and skinning (M1.16)   | done   | Not part of the composition; covered by the Skeleton Lab                                |
-| Arena consistency (gameplay vs. visual) | done   | `integration-arena.test.ts`, for the placeholder arena only (#226)                      |
+| Arena consistency (gameplay vs. visual) | done   | `integration-arena.test.ts` (placeholder); `arena-training-hall` tests                  |
 | Determinism (soak, restore)             | done   | `integration-soak.test.ts`: 36,037 frames, 24 seeded restores, equal hashes and events  |
 | Replay equality (camera, effects, cues) | done   | `integration-replay.test.ts`; in the browser, equal final frame, hash, effects and cues |
 | Frame budget                            | done   | [development.md](development.md#m1-integration-2026-11-27-integration-lab)              |
@@ -80,14 +80,15 @@ Gaps, as orch tickets (`orch ticket show <id>`):
 
 - **#222** Texture manifests: share one loaded manifest between several renderables. The lab
   hands one mannequin a non-releasing copy of the other's textures.
-- **#226** Arena content: a production arena package checked against its gameplay rules.
+- **#233** Arena content: draw `arena-training-hall` in the game and serve a content
+  package's assets to the browser.
 - **#219** Animation Lab: draw with the Pixi skeletal renderer (deferred from M1.18).
 - **#216** (filed earlier) Replay: sessions created with `movement` or `arena` options cannot
   be recorded, so the lab's session uses the default movement parameters and arena.
 
 M2 combat work on the simulation side is not blocked by any of these. #222 should
 land before the M2 sandbox draws hits on two mannequins. The game screen already runs the
-composition (#224, `@mortal-doctrine/match-view`), with the placeholder fixture until #226.
+composition (#224, `@mortal-doctrine/match-view`), with the placeholder fixture until #233.
 
 ## Architectural decisions carried into M1
 
