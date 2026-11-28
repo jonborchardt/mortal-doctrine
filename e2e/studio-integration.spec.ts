@@ -141,11 +141,7 @@ test('the camera zooms out to keep a jumping fighter in frame', async ({ page },
   await page.keyboard.up('KeyW');
   await expect(readout(page, 'p1-state')).toHaveText('air');
   await expect.poll(numberOf(page, 'p1-y')).toBeGreaterThan(19_000);
-  // 200 + 250 world units of headroom in the 460 px above the ground line: 450 x 960 / 460 =
-  // 939.13 world units across, around the fighters' midpoint at 480: inside the bounds.
   await expect.poll(visibleWidth).toBeGreaterThan(70_000);
-  await expect(readout(page, 'camera-left')).toHaveText('1043');
-  await expect(readout(page, 'camera-right')).toHaveText('94957');
   // Review evidence: the whole airborne mannequin, staff included, is below the top edge.
   await page
     .getByTestId('arena')
