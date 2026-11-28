@@ -315,8 +315,10 @@ arena presentation data (layers with parallax factors, ground line, visual bound
 manifest texture ids); `createArenaRenderable` is a registered renderable that draws the layers
 back to front in one renderer layer, shifting each horizontally by its factor for the frame's
 `View` (Pixi-free rule: `parallaxToScreen`). It owns the textures it is given. Gameplay bounds
-stay in `movement`; no arena content package exists, so the game draws the placeholder arena
-through `match-view`. See the package README.
+stay in `movement`. The first arena content package, `@mortal-doctrine/arena-training-hall`,
+holds its rules and presentation data in one definition checked by its tests; it is not wired
+into any app yet (#233), so the game draws the placeholder arena through `match-view`. See the
+package README.
 
 **Effects (implemented, `@mortal-doctrine/effects`).** Zod-validated effect definitions
 (`core/<name>` or `<character>/<name>`; placeholder `sprite` or `particles`) and an event-type →
@@ -332,7 +334,7 @@ Integration Lab share: `createTickSource` splits a runner advance into per-tick
 through the camera's view; `mountMatchStage` builds the Pixi stage (renderer, arena, two
 skeletons, effects) and queues mounts so a teardown and the next build never interleave. It names no rig,
 arena, cue or effect: the placeholder match is its `./testing` fixture, which the game uses
-until content packages exist (#226). See the package README.
+until content packages are wired in (#233). See the package README.
 
 The 960×540 viewport and the 2× texture resolution are **defaults, not architectural
 constraints**. No code may assume the logical viewport equals the arena width.

@@ -1,0 +1,26 @@
+{
+  "name": "@mortal-doctrine/arena-training-hall",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "mortalDoctrine": {
+    "layer": "content"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mortal-doctrine/arena": "workspace:*",
+    "@mortal-doctrine/movement": "workspace:*"
+  },
+  "devDependencies": {
+    "@mortal-doctrine/renderer": "workspace:*",
+    "@mortal-doctrine/simulation": "workspace:*",
+    "@types/node": "^24.19.4",
+    "vitest": "^5.1.2"
+  }
+}
