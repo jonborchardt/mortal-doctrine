@@ -64,17 +64,26 @@ const AT_REST = [
   { point: { x: 480, y: 304 }, colour: BACKGROUND },
 ];
 
+/**
+ * Waits for the stage, then samples it. The frame counter is written only by a fully built
+ * stage, so the colour poll does not spend its time on a cold dev server or texture loading.
+ */
+async function expectMatchAtRest(page: Page) {
+  await expect(page.getByTestId('sim-frame')).toHaveText(/\d+/, { timeout: 30_000 });
+  await expectColours(page, AT_REST);
+}
+
 test('draws the arena and both mannequins with live textures, also after a reload', async ({
   page,
 }, testInfo) => {
   // The dev server renders in StrictMode: this stage is the second mount, built after the first
   // one was disposed. Released or missing textures would not draw these colours.
-  await expectColours(page, AT_REST);
+  await expectMatchAtRest(page);
   await expect(page.getByTestId('arena').locator('canvas')).toHaveCount(1);
   await page.screenshot({ path: testInfo.outputPath('game-screen.png'), fullPage: true });
 
   await page.reload();
-  await expectColours(page, AT_REST);
+  await expectMatchAtRest(page);
   await expect(page.getByTestId('arena').locator('canvas')).toHaveCount(1);
 });
 
@@ -97,9 +106,8 @@ test('loads its fixtures from its own origin without failed requests or errors',
   page,
   baseURL,
 }) => {
-  // The stage has loaded both manifests and every texture once the frame counter runs.
-  await expect(page.getByTestId('sim-frame')).toHaveText(/\d+/);
-  await expectColours(page, AT_REST);
+  // The stage has loaded both manifests and every texture once it draws.
+  await expectMatchAtRest(page);
   const urls = requested.get(page) ?? [];
   for (const manifest of ['arena', 'skeleton']) {
     expect(urls).toContain(new URL(`/fixtures/${manifest}/manifest.json`, baseURL).href);
