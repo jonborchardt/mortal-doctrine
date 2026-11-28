@@ -7,9 +7,9 @@
     "node": ">=24 <25"
   },
   "scripts": {
-    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
-    "dev:game": "pnpm --filter @mortal-doctrine/game dev",
-    "dev:studio": "pnpm --filter @mortal-doctrine/studio dev",
+    "dev": "node scripts/dev.ts pnpm --parallel --filter \"./apps/*\" dev",
+    "dev:game": "node scripts/dev.ts pnpm --filter @mortal-doctrine/game dev",
+    "dev:studio": "node scripts/dev.ts pnpm --filter @mortal-doctrine/studio dev",
     "build": "pnpm --filter \"./apps/*\" build",
     "typecheck": "tsc -p tsconfig.json && pnpm -r typecheck",
     "lint": "eslint .",
