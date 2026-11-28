@@ -1,3 +1,4 @@
+import { commandListSchema, requiredHistory } from '@mortal-doctrine/commands';
 import { frameInputsSchema } from '@mortal-doctrine/sim-core';
 import { MAX_HISTORY_CAPACITY } from '@mortal-doctrine/simulation';
 import { z } from 'zod';
@@ -18,11 +19,13 @@ const checksumSchema = z
 export const replaySchema = z
   .object({
     replayVersion: z.literal(REPLAY_VERSION),
-    /** `createInitialState` options, always explicit. */
+    /** `createInitialState` options, always explicit when recorded. */
     options: z
       .object({
         seed: z.int().min(0).max(0xffff_ffff),
         historyCapacity: z.int().min(1).max(MAX_HISTORY_CAPACITY),
+        /** Missing on import (replays exported before commands were recorded) reads as none. */
+        commands: commandListSchema.default([]),
       })
       .readonly(),
     checksumInterval: z.int().min(1),
@@ -31,7 +34,17 @@ export const replaySchema = z
     checksums: z.array(checksumSchema).readonly(),
   })
   .superRefine((replay, ctx) => {
-    const { checksums, inputs } = replay;
+    const { checksums, inputs, options } = replay;
+    options.commands.forEach((definition, index) => {
+      const needed = requiredHistory(definition);
+      if (needed > options.historyCapacity) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['options', 'commands', index],
+          message: `needs ${needed} history frames, more than historyCapacity ${options.historyCapacity}`,
+        });
+      }
+    });
     const issue = (index: number, message: string) =>
       ctx.addIssue({ code: 'custom', path: ['checksums', index, 'frame'], message });
     checksums.forEach(({ frame }, index) => {

@@ -1,3 +1,4 @@
+import { commandCycleScript, GENERIC_COMMANDS } from '@mortal-doctrine/commands/testing';
 import { InputBit, TICK_MS, type FrameInputs } from '@mortal-doctrine/sim-core';
 import {
   createInitialState,
@@ -5,7 +6,9 @@ import {
   DEFAULT_HISTORY_CAPACITY,
   deserializeState,
   serializeState,
+  type InitialStateOptions,
   type InputProvider,
+  type SimulationEvent,
 } from '@mortal-doctrine/simulation';
 import { runFrames, SEEDED_OPTIONS, walkCycleScript } from '@mortal-doctrine/simulation/testing';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -166,7 +169,7 @@ describe('recorder', () => {
     expect(replay.inputs).toHaveLength(241);
     expect(replay.inputs.length).toBeGreaterThan(runner.state.input.capacity);
     expect(replay.inputs).toEqual(returned);
-    expect(replay.options).toEqual(SEEDED_OPTIONS);
+    expect(replay.options).toEqual({ ...SEEDED_OPTIONS, commands: [] });
     expect(replaySchema.parse(replay)).toEqual(replay);
   });
 
@@ -197,7 +200,11 @@ describe('recorder', () => {
   it('stores explicit default options', () => {
     const runner = createSimulationRunner();
     const replay = createReplayRecorder({ getState: () => runner.state }).finish();
-    expect(replay.options).toEqual({ seed: 0, historyCapacity: DEFAULT_HISTORY_CAPACITY });
+    expect(replay.options).toEqual({
+      seed: 0,
+      historyCapacity: DEFAULT_HISTORY_CAPACITY,
+      commands: [],
+    });
     expect(replay.checksumInterval).toBe(60);
   });
 
@@ -301,6 +308,118 @@ describe('recorder', () => {
   });
 });
 
+describe('a session with command definitions', () => {
+  // SEEDED_OPTIONS keeps 8 history frames, too few for GENERIC_COMMANDS.
+  const COMMAND_OPTIONS = {
+    seed: 0x9e37_79b9,
+    historyCapacity: 60,
+    commands: GENERIC_COMMANDS,
+  } satisfies InitialStateOptions;
+  // More than one 112-frame cycle of the command scripts; checksums at 60, 120 and 150.
+  const TICKS = 150;
+  let replay: Replay;
+  let live: string[];
+  let events: SimulationEvent[];
+  beforeAll(() => {
+    const runner = createSimulationRunner(COMMAND_OPTIONS);
+    const recorder = createReplayRecorder({
+      options: COMMAND_OPTIONS,
+      getState: () => runner.state,
+    });
+    const provider = recorder.provider(commandCycleScript);
+    live = [serializeState(runner.state)];
+    events = [];
+    for (let i = 0; i < TICKS; i++) {
+      events.push(...runner.stepOnce(provider));
+      live.push(serializeState(runner.state));
+    }
+    replay = deepFreeze(recorder.finish());
+  });
+  const without = (mutate: (options: Record<string, unknown>) => void) => {
+    const json = asJson(replay);
+    mutate(json.options);
+    return JSON.stringify(json);
+  };
+
+  it('records the definitions and plays back identically on every frame', () => {
+    expect(replay.options).toEqual(COMMAND_OPTIONS);
+    // Not vacuous: commands were recognized and the definitions are in the state.
+    expect(events.some((event) => event.type === 'command')).toBe(true);
+    expect(deserializeState(live[TICKS]!).commands.definitions).toEqual(GENERIC_COMMANDS);
+
+    const imported = deserializeReplay(serializeReplay(replay));
+    expect(imported).toEqual(replay);
+    const player = createReplayPlayer(imported);
+    for (let frame = 0; frame <= TICKS; frame++) {
+      expect(player.frame).toBe(frame);
+      expect(serializeState(player.state)).toBe(live[frame]);
+      expect(player.stepOnce()).toBe(frame < TICKS);
+    }
+    expect(player.desync).toBeNull();
+  });
+
+  it('seeks forwards and backwards to the live state and steps on from there', () => {
+    const player = createReplayPlayer(deserializeReplay(serializeReplay(replay)));
+    for (const frame of [70, TICKS, 45, 0, 119]) {
+      player.seek(frame);
+      expect(serializeState(player.state)).toBe(live[frame]);
+      for (let next = frame + 1; next <= Math.min(frame + 20, TICKS); next++) {
+        expect(player.stepOnce()).toBe(true);
+        expect(serializeState(player.state)).toBe(live[next]);
+      }
+      expect(player.desync).toBeNull();
+    }
+  });
+
+  it.each([
+    ['dropped', (options: Record<string, unknown>) => delete options.commands],
+    ['emptied', (options: Record<string, unknown>) => (options.commands = [])],
+  ])('reports a desync at the first checksum when the definitions are %s', (_name, mutate) => {
+    const stripped = deserializeReplay(without(mutate));
+    expect(stripped.options.commands).toEqual([]);
+    for (const reach of [
+      (player: ReplayPlayer) => player.seek(TICKS),
+      (player: ReplayPlayer) => {
+        player.play();
+        for (let i = 0; i < 100; i++) player.advance(TICK_MS * 10);
+      },
+    ]) {
+      const player = createReplayPlayer(stripped);
+      reach(player);
+      expect(player.frame).toBe(60);
+      expect(player.desync?.frame).toBe(60);
+      expect(player.desync?.actual.stateHash).not.toBe(player.desync?.expected.stateHash);
+    }
+  });
+
+  it('refuses to record when the options omit the session definitions', () => {
+    const runner = createSimulationRunner(COMMAND_OPTIONS);
+    const { seed, historyCapacity } = COMMAND_OPTIONS;
+    expect(() =>
+      createReplayRecorder({ options: { seed, historyCapacity }, getState: () => runner.state }),
+    ).toThrow('Replay recording must start from createInitialState(options)');
+    runner.stepOnce(commandCycleScript);
+    expect(() =>
+      createReplayRecorder({ options: COMMAND_OPTIONS, getState: () => runner.state }),
+    ).toThrow('Replay recording must start from createInitialState(options)');
+  });
+
+  it('rejects malformed definitions on import, naming the path', () => {
+    const importing = (commands: unknown) => () =>
+      deserializeReplay(without((options) => (options.commands = commands)));
+    const [first, second] = GENERIC_COMMANDS;
+    expect(importing('none')).toThrow(/Invalid replay: replay\.options\.commands: /);
+    expect(importing([{ ...first, id: undefined }])).toThrow(/replay\.options\.commands\.0\.id: /);
+    expect(importing([first, { ...second, id: first?.id }])).toThrow(
+      /replay\.options\.commands\.1\.id: duplicate id "quarter-circle"/,
+    );
+    // GENERIC_COMMANDS[3] is the spin: a 30-frame window, more than 20 frames of history.
+    expect(() => deserializeReplay(without((options) => (options.historyCapacity = 20)))).toThrow(
+      /replay\.options\.commands\.3: needs 30 history frames, more than historyCapacity 20/,
+    );
+  });
+});
+
 describe('tamper detection', () => {
   let replay: Replay;
   let live: string[];
@@ -379,6 +498,19 @@ describe('deserializeReplay', () => {
     mutate(json);
     return expect(() => deserializeReplay(JSON.stringify(json)));
   };
+
+  it('reads a replay exported without options.commands as having none', () => {
+    const json = asJson(replay);
+    delete json.options.commands;
+    expect(json.options).toEqual(SEEDED_OPTIONS);
+    const imported = deserializeReplay(JSON.stringify(json));
+    expect(imported.options).toEqual({ ...SEEDED_OPTIONS, commands: [] });
+    expect(imported).toEqual(replay);
+    const player = createReplayPlayer(imported);
+    player.seek(player.length);
+    expect(player.frame).toBe(130);
+    expect(player.desync).toBeNull();
+  });
 
   it('rejects text that is not JSON', () => {
     expect(() => deserializeReplay('{"replayVersion":1,')).toThrow(/^Replay is not valid JSON: /);

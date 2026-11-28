@@ -1,6 +1,6 @@
 # @mortal-doctrine/replay
 
-**Layer:** `simulation` · **May depend on:** `sim-core`, `simulation`, `zod`.
+**Layer:** `simulation` · **May depend on:** `commands`, `sim-core`, `simulation`, `zod`.
 
 Records a simulation session as its seeded initial-state options plus the complete per-tick
 `FrameInputs` stream, and plays it back by re-simulating. Periodic checksums of the live session
@@ -18,12 +18,18 @@ as a desync at the first checksum.
 ```ts
 {
   replayVersion: 1,
-  options: { seed, historyCapacity },   // createInitialState options, always explicit
-  checksumInterval: 60,                 // ticks between checksums
-  inputs: [[p1, p2], ...],              // inputs[f] is what tick f was stepped with
+  options: { seed, historyCapacity, commands }, // createInitialState options, always explicit
+  checksumInterval: 60,                         // ticks between checksums
+  inputs: [[p1, p2], ...],                      // inputs[f] is what tick f was stepped with
   checksums: [{ frame, stateHash, inputsHash }, ...],
 }
 ```
+
+`options.commands` is the session's command definitions (`@mortal-doctrine/commands`), `[]` when
+it has none. The recorder always writes it; on import a missing `commands` is read as `[]`, so
+version 1 replays exported before it existed still play. Import rejects a definition that needs
+more history than `historyCapacity`. The `movement` and `arena` options of `createInitialState`
+are not recorded yet: the recorder throws for a session created with either.
 
 A checksum at `frame` describes the session after `inputs[0..frame)`: `stateHash` is
 `hashState` of the live state at that frame and `inputsHash` a running digest of those inputs.
