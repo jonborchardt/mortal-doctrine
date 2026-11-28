@@ -39,12 +39,12 @@ drawn first. `present(state, [])` redraws: the same frame again returns the came
 output. A presenter is one timeline; create a new one when the simulation restarts.
 
 **Stage.** The renderer is created without placeholders. The arena renderable owns the arena
-manifest's textures. Both skeletons draw from one manifest: the second renderable owns the
-textures and the first borrows them (#222). `dispose()` destroys the renderer, which destroys
-every renderable and releases the textures.
+manifest's textures. Both skeletons draw from one manifest, loaded once per skeleton: each
+renderable owns its own handle, and the textures are unloaded when the last one is released.
+`dispose()` destroys the renderer, which destroys every renderable and releases the textures.
 
-**Mount queue.** A texture manifest's URLs have one owner at a time. Mounts are queued in this
-module: a mount starts building only after the previous mount finished building (or gave up) and
+**Mount queue.** Mounts are queued in this module, so a stage being torn down and the one
+replacing it never interleave: a mount starts building only after the previous mount finished building (or gave up) and
 every texture release it started has finished. A mount disposed while waiting builds nothing; one
 disposed while loading registers nothing further on a live renderer and releases what it loaded.
 This is what makes a React StrictMode mount, unmount and remount safe; callers keep no chain of

@@ -6,15 +6,63 @@ export interface LoadedTextures {
   readonly textures: Readonly<Record<string, Texture>>;
   /** Texture id → absolute URL it was loaded from (the Pixi asset cache key). */
   readonly urls: Readonly<Record<string, string>>;
-  /** Unloads every texture from Pixi's asset cache and destroys it. Idempotent. */
+  /**
+   * Gives this handle's textures back. A texture is unloaded from Pixi's asset cache and
+   * destroyed when the last handle holding its URL is released. Idempotent.
+   */
   release(): Promise<void>;
 }
 
-// A URL being released must finish unloading before it is loaded again, or the new load would
-// receive the texture that is about to be destroyed.
+// Pixi caches one texture per URL with no reference count, so the handles holding a URL are
+// counted here and the URL is unloaded when the last one lets go.
+interface Held {
+  readonly resolution: number;
+  readonly texture: Promise<Texture>;
+  count: number;
+}
+const held = new Map<string, Held>();
+
+// A URL being unloaded must finish before it is loaded again, or the new load would receive the
+// texture that is about to be destroyed.
 const releasing = new Map<string, Promise<void>>();
 
-async function unload(url: string): Promise<void> {
+/** Takes one count on `url`, loading it when nothing holds it. */
+async function acquire(url: string, resolution: number): Promise<Texture> {
+  while (releasing.has(url)) await releasing.get(url);
+  // No await from here to the count: a release racing this load sees it.
+  let entry = held.get(url);
+  if (entry === undefined) {
+    entry = {
+      resolution,
+      count: 0,
+      texture: Assets.load<Texture>({ alias: url, src: url, data: { resolution } }),
+    };
+    held.set(url, entry);
+  } else if (entry.resolution !== resolution) {
+    throw new Error(
+      `${url} is loaded at resolution ${entry.resolution} and cannot also be loaded at ${resolution}`,
+    );
+  }
+  entry.count += 1;
+  try {
+    return await entry.texture;
+  } catch (cause) {
+    if (held.get(url) === entry) {
+      // Nothing was cached; forget the alias so a retry honours its own resolution.
+      held.delete(url);
+      Assets.resolver.removeAlias(url);
+    }
+    throw cause;
+  }
+}
+
+/** Gives one count on `url` back; the last one unloads it. */
+function drop(url: string): Promise<void> {
+  const entry = held.get(url);
+  if (entry === undefined) return Promise.resolve();
+  entry.count -= 1;
+  if (entry.count > 0) return Promise.resolve();
+  held.delete(url);
   const done = Assets.unload(url).finally(() => {
     // Drop the resolver entry so the next load honours its own `resolution`.
     Assets.resolver.removeAlias(url);
@@ -26,8 +74,9 @@ async function unload(url: string): Promise<void> {
 
 /**
  * Fetches a texture manifest and loads every texture it lists at `resolution` (default 2: a
- * 192×64 px file is 96×32 logical px). Rejects naming the texture id and URL that failed, after
- * releasing whatever had loaded.
+ * 192×64 px file is 96×32 logical px). Every call returns its own handle; handles on the same URL
+ * share one texture, so a URL some live handle holds at another resolution is rejected. Rejects
+ * naming the texture id and URL that failed, after releasing whatever it had acquired.
  */
 export async function loadTextureManifest(
   manifestUrl: string,
@@ -44,15 +93,8 @@ export async function loadTextureManifest(
   const loaded = await Promise.all(
     entries.map(async ([id, url]) => {
       try {
-        await releasing.get(url);
-        return {
-          url,
-          id,
-          texture: await Assets.load<Texture>({ alias: url, src: url, data: { resolution } }),
-        };
+        return { url, id, texture: await acquire(url, resolution) };
       } catch (cause) {
-        // Nothing was cached; forget the alias so a retry honours its own resolution.
-        Assets.resolver.removeAlias(url);
         const error = new Error(`Texture "${id}" failed to load from ${url}: ${String(cause)}`, {
           cause,
         });
@@ -75,7 +117,7 @@ export async function loadTextureManifest(
   const release = async () => {
     if (released) return;
     released = true;
-    await Promise.all(loadedUrls.map(unload));
+    await Promise.all(loadedUrls.map(drop));
   };
   if (failure !== undefined) {
     await release();

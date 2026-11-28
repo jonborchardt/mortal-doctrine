@@ -48,9 +48,9 @@ pose), per-attachment offsets, rotation or tint, production art, camera, interpo
   from the factory call on. `destroy()` is synchronous and idempotent: it destroys the container,
   its sprites and meshes, and the mesh geometry (with its buffers), then calls `textures.release()` once without awaiting it; a rejected release
   is reported with `console.error`. If the factory throws, it has already released the set.
-  The renderer caches one texture per URL, so give each manifest a single live owner: destroy
-  (unregister) the old renderable before loading the manifest again. `loadTextureManifest`
-  waits for the pending release itself.
+  Give each renderable its own handle: `loadTextureManifest` counts the handles on a URL and
+  unloads it with the last release, so two renderables can draw from the same manifest (loaded
+  once each, at the same resolution) and be destroyed in any order.
 - `update` throws what `evaluate` and `orderSlots` throw for a pose that names an unknown bone,
   slot or attachment.
 

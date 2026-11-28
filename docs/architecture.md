@@ -283,7 +283,9 @@ and never mutates simulation state. Other presentation packages extend it withou
   an unregister), receives `{ state, previous, alpha, events, view }` every drawn frame and has
   a `destroy` hook. The placeholder floor and fighters are registered renderables.
 - **Textures:** `loadTextureManifest` validates a `schemaVersion: 1` manifest with Zod and loads
-  textures through Pixi `Assets` at a per-call resolution (default 2×), with a release function.
+  textures through Pixi `Assets` at a per-call resolution (default 2×). Each call returns its own
+  handle with a release function; handles on the same URL are counted and share one texture (so
+  one resolution), which is unloaded when the last handle is released.
 - **Host loop:** `startHostLoop` owns renderer + runner + frame subscription for the Simulation
   Lab (the Replay, Command and Input Labs keep their own setup; the game and the Integration Lab
   use `match-view`, see #223).
@@ -327,7 +329,7 @@ once. The game and the Integration Lab mount it through `match-view`. See the pa
 Integration Lab share: `createTickSource` splits a runner advance into per-tick
 `{ state, events }`; `createPresenter` feeds the camera and audio every tick, then draws once
 through the camera's view; `mountMatchStage` builds the Pixi stage (renderer, arena, two
-skeletons, effects) and queues mounts so each texture manifest has one owner. It names no rig,
+skeletons, effects) and queues mounts so a teardown and the next build never interleave. It names no rig,
 arena, cue or effect: the placeholder match is its `./testing` fixture, which the game uses
 until content packages exist (#226). See the package README.
 
