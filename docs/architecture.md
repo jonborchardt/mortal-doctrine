@@ -328,8 +328,8 @@ concern (see Layers). Visual animation never determines combat timing; move fram
 
 **Implemented:** rigs and pose evaluation (`rig`); keyframed clips, sampling, blending and the pose
 pipeline (`animation`); skeletal rendering of evaluated rigs (`skeleton-renderer`, presentation
-layer); two-bone IK, aim and angle-limit constraints as a pose pipeline stage (`animation`). Mesh
-deformation is not.
+layer); two-bone IK, aim and angle-limit constraints as a pose pipeline stage (`animation`); mesh
+deformation by linear blend skinning (`animation`), drawn as Pixi meshes by `skeleton-renderer`.
 
 ## Studio — Implemented (convention), Intended (labs)
 
