@@ -46,6 +46,57 @@ it, so none becomes ready until it merges. M1.17 is nonblocking technical debt.
 **Parallel waves** (after M1.01 merges): {02, 03, 04, 05, 07, 14, 15, 17} → {06, 11, 13} →
 {08, 10, 12} → {09, 16} → 18. Critical path: 04 → 06 → 08 → 09, and 06 + 07 → 10 → 16.
 
+## M2 readiness
+
+Checked by M1.18 (#199) on 2026-11-27 through the Integration Lab (`/labs/integration`) and the
+Studio tests `apps/studio/tests/integration-*.test.ts`. "Done" means the system runs in the
+composed session from its production package. A gap names the ticket that closes it.
+
+| Item                                    | Status | Evidence or gap                                                                         |
+| --------------------------------------- | ------ | --------------------------------------------------------------------------------------- |
+| Simulation core and contracts (M1.01)   | done   | Every tick of the lab and of the soak runs through `step`                               |
+| Device input capture (M1.02)            | done   | Live capture drives the fighters (`e2e/studio-integration.spec.ts`)                     |
+| Command recognition (M1.03)             | done   | `command` events in the soak, with their effects and cues                               |
+| Math primitives (M1.04)                 | done   | Used through `rig`, `animation` and `skeleton-renderer`                                 |
+| Movement and pushboxes (M1.05)          | done   | Walk, jump, crouch and wall contact in the soak                                         |
+| Skeletal rig (M1.06)                    | done   | Two `MANNEQUIN_RIG` instances                                                           |
+| Rendering infrastructure (M1.07)        | gap    | Layers and renderables work. Shared textures #222, host loop #223                       |
+| Skeletal animation (M1.08)              | done   | Fixture clips sampled per snapshot. The state-to-clip mapping is lab-local placeholder  |
+| IK and pose constraints (M1.09)         | done   | Not part of the composition; covered by its own lab and tests                           |
+| Skeletal rendering (M1.10)              | gap    | Draws both mannequins. Two renderables cannot share a manifest #222                     |
+| Camera (M1.11)                          | gap    | Frames both fighters. A jump leaves the frame at the fixture's closest zoom #225        |
+| Arena and parallax (M1.12)              | gap    | Placeholder arena drawn through the camera. No production arena package #226            |
+| Visual effects (M1.13)                  | done   | Spawned once per event, live and in playback                                            |
+| Audio (M1.14)                           | gap    | Cues trigger once per event. No reset for a restarted timeline #221                     |
+| Replay (M1.15)                          | gap    | Records and replays without desync. The player returns no events #220; options #216     |
+| Mesh deformation and skinning (M1.16)   | done   | Not part of the composition; covered by the Skeleton Lab                                |
+| Arena consistency (gameplay vs. visual) | done   | `integration-arena.test.ts`, for the placeholder arena only (#226)                      |
+| Determinism (soak, restore)             | done   | `integration-soak.test.ts`: 36,037 frames, 24 seeded restores, equal hashes and events  |
+| Replay equality (camera, effects, cues) | done   | `integration-replay.test.ts`; in the browser, equal final frame, hash, effects and cues |
+| Frame budget                            | done   | [development.md](development.md#m1-integration-2026-11-27-integration-lab)              |
+| Game screen uses the composition        | gap    | `apps/game` still shows the placeholder fighters #224                                   |
+
+Gaps, as orch tickets (`orch ticket show <id>`):
+
+- **#220** Replay player: return the simulation events of the ticks it runs. Playback cannot
+  drive effects, audio or shake without stepping every tick twice, as the lab does.
+- **#221** Audio player: explicit reset of the dedupe memory for a restarted timeline. The lab
+  creates a new player and `AudioContext` per timeline.
+- **#222** Texture manifests: share one loaded manifest between several renderables. The lab
+  hands one mannequin a non-releasing copy of the other's textures.
+- **#223** Host loop: support a camera view before render and a replay player as the state
+  source. The lab cannot use `startHostLoop` and owns its renderer and frame callback.
+- **#224** Game screen: wire the M1 composition into `apps/game` (deferred from M1.18).
+- **#225** Camera: keep a jumping fighter in frame. The lab limits the closest zoom instead.
+- **#226** Arena content: a production arena package checked against its gameplay rules.
+- **#219** Animation Lab: draw with the Pixi skeletal renderer (deferred from M1.18).
+- **#216** (filed earlier) Replay: sessions created with `movement` or `arena` options cannot
+  be recorded, so the lab's session uses the default movement parameters and arena.
+
+M2 combat work on the simulation side is not blocked by any of these. #220, #222 and #225 should
+land before the M2 sandbox draws hits on two mannequins, and #224 before anything is shown in
+the game.
+
 ## Architectural decisions carried into M1
 
 - **Input:** device capture (M1.02, presentation) is separate from command recognition (M1.03,
@@ -75,7 +126,7 @@ it, so none becomes ready until it merges. M1.17 is nonblocking technical debt.
 - **M1.04 is provisional.** Its spec challenge must confirm a meaningful capability with several
   consumers, or recommend folding it into M1.06.
 - **Skeleton Lab** is extended in sequence by M1.10 and M1.16; the Animation Lab adopts Pixi
-  rendering in M1.18.
+  rendering later (#219, deferred from M1.18).
 - **Shared-file hotspots:** `packages/simulation` composition (M1.03, M1.05, M1.15 add phases or
   hooks), `apps/studio/package.json` and `pnpm-lock.yaml` (every lab; see
   [build-system.md](build-system.md#lockfile-conflicts)), and `apps/game/src/App.tsx` (game
