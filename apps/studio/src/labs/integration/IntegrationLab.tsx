@@ -57,7 +57,8 @@ export function IntegrationLab() {
 
     mount.ready
       .then((stage) => {
-        if (!stage) return;
+        // Disposed just after the stage was built: nothing may be created that outlives teardown.
+        if (!stage || disposed) return;
         const { renderer, effects } = stage;
 
         const captures = [

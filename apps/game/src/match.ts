@@ -26,6 +26,7 @@ export function startMatch(
   onError: (cause: unknown) => void,
 ): () => void {
   const mount = mountMatchStage(host, STAGE);
+  let disposed = false;
   let teardown = () => {};
   const readouts = new Map(
     [...root.querySelectorAll<HTMLElement>('[data-readout]')].map((el) => [el.dataset.readout, el]),
@@ -37,7 +38,8 @@ export function startMatch(
 
   mount.ready
     .then((stage) => {
-      if (!stage) return;
+      // Disposed just after the stage was built: nothing may be created that outlives teardown.
+      if (!stage || disposed) return;
       const { renderer, effects } = stage;
       const captures = [
         createInputCapture(DEFAULT_PLAYER_BINDINGS[0]),
@@ -93,6 +95,7 @@ export function startMatch(
     .catch(onError);
 
   return () => {
+    disposed = true;
     teardown();
     mount.dispose();
   };
