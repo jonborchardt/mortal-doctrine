@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { expectColours, type Rgb } from './canvas';
 
 const INTEGRATION_LAB = '/labs/integration';
 // The seeded fixture: both fighters standing at their default positions on frame 0.
@@ -19,6 +20,13 @@ const FIXTURE = {
   'played-frame': '—',
   'played-hash': '—',
 } as const;
+
+// The mannequins' body attachments at rest on the 960 px canvas, as in `game.spec.ts`.
+const BODY_PLAIN: Rgb = [0x4f, 0x8f, 0xd9];
+const BOTH_MANNEQUINS = [
+  { point: { x: 192, y: 304 }, colour: BODY_PLAIN },
+  { point: { x: 768, y: 304 }, colour: BODY_PLAIN },
+];
 
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
 const readout = (page: Page, key: string) => page.getByTestId(`integration-${key}`);
@@ -58,6 +66,8 @@ test('integration lab is listed under Analysis and loads the seeded fixture', as
   // React StrictMode mounts, unmounts and remounts in development: a leaked renderer would
   // leave a second canvas behind.
   await expect(page.getByTestId('arena').locator('canvas')).toHaveCount(1);
+  // Both skeletons hold their own handle on one texture manifest.
+  await expectColours(page, BOTH_MANNEQUINS);
   await expect(readout(page, 'seed')).toHaveText('1180199');
   // The camera frames both fighters inside the arena's visual bounds.
   await expect.poll(numberOf(page, 'camera-left')).toBeGreaterThanOrEqual(-4000);
@@ -76,6 +86,8 @@ test('integration lab is listed under Analysis and loads the seeded fixture', as
   await expect(button(page, 'Play')).toBeEnabled({ timeout: 30_000 });
   await expectFixture(page);
   await expect(page.getByTestId('arena').locator('canvas')).toHaveCount(1);
+  // The stage released its textures on leaving; the new one loaded and draws them again.
+  await expectColours(page, BOTH_MANNEQUINS);
   expect(errors).toEqual([]);
 });
 
