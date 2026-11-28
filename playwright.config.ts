@@ -1,4 +1,5 @@
 import { createServer } from 'node:net';
+import { availableParallelism } from 'node:os';
 import { defineConfig, devices } from '@playwright/test';
 
 // Worktree isolation: every run starts its own dev servers on free ports and never reuses an
@@ -29,6 +30,10 @@ const isCI = Boolean(process.env.CI);
 export default defineConfig({
   testDir: 'e2e',
   outputDir: 'test-results',
+  // Every worker is a Chromium rendering WebGL in software (SwiftShader) at 60 fps. Measured on
+  // 12 threads: 6 workers (the default, half the cores) ran the suite slower than 3 and starved
+  // tests until 5 s assertions timed out. More than 3 only adds contention.
+  workers: Math.max(1, Math.min(3, Math.floor(availableParallelism() / 2))),
   forbidOnly: isCI,
   reporter: isCI ? [['github'], ['html', { open: 'never' }]] : 'list',
   use: { trace: 'retain-on-failure', screenshot: 'only-on-failure' },

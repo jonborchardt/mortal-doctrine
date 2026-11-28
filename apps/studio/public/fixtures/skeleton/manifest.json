@@ -13,6 +13,7 @@
     "wing-left-membrane": "textures/wing-left-membrane@2x.png",
     "wing-right-feathers": "textures/wing-right-feathers@2x.png",
     "wing-right-membrane": "textures/wing-right-membrane@2x.png",
-    "shell-plain": "textures/shell-plain@2x.png"
+    "shell-plain": "textures/shell-plain@2x.png",
+    "limb-skin": "textures/limb-skin@2x.png"
   }
 }

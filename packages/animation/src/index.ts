@@ -18,3 +18,13 @@ export {
   type ConstraintsData,
 } from './constraint';
 export { orderSlots, sample, type AnimatedPose } from './sample';
+export {
+  loadMesh,
+  MAX_INFLUENCES,
+  MESH_SCHEMA_VERSION,
+  meshDataSchema,
+  skin,
+  WEIGHT_TOLERANCE,
+  type Mesh,
+  type MeshData,
+} from './mesh';
