@@ -1,38 +1,27 @@
 name: CI
 
+# EXPERIMENT ONLY (never merge): does Windows Defender real-time scanning cause the e2e stalls?
 on:
-  push:
-    branches: [main]
   pull_request:
 
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  verify:
+  stall:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        defender: [on, off]
+        run: [1, 2, 3, 4, 5, 6, 7, 8]
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
-      # Version comes from "packageManager" in package.json.
+      - if: matrix.defender == 'off'
+        shell: pwsh
+        run: Set-MpPreference -DisableRealtimeMonitoring $true; (Get-MpPreference).DisableRealtimeMonitoring
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm check
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e
-      - if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-${{ matrix.os }}
-          path: |
-            playwright-report/
-            test-results/
-          retention-days: 7
