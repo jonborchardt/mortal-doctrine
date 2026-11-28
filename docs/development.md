@@ -96,7 +96,8 @@ Character APIs do not exist yet (M2–M3). The fixed parts:
   rendering controls select the viewport (recreating the loop), toggle interpolation (with an
   alpha readout), register a lab-local fixture renderable in a chosen layer and pick its texture
   resolution; a readout lists every fixture's update count, destroy count and texture release. The game
-  shows frame number, FPS and player one's x in world units.
+  shows frame number, FPS, player one's x in world units, and counts of effects spawned and
+  audio cues triggered.
 - The Input Lab (`/labs/input`) shows, per player, raw device state (held keys, gamepad buttons
   and stick), presses latched for the next tick, the frames sampled each tick, and a log of
   latched taps. Pause and Step make single ticks observable.
@@ -126,8 +127,9 @@ Character APIs do not exist yet (M2–M3). The fixed parts:
   simulation events. Reset, Play/Pause, Step, Record, Stop and Play replay; readouts show the
   frame, seed, mode, each fighter's x, y and state, active and spawned effects, triggered audio
   cues, the visible span, the final frame and state hash of the recording and of its playback,
-  render FPS, tick rate, frame CPU time and simulation update time. Its composition
-  (`apps/studio/src/labs/integration/session.ts`) also runs headless in the Studio's Node tests,
+  render FPS, tick rate, frame CPU time and simulation update time. The presentation order, the
+  stage and the placeholder fixture are `packages/match-view`, shared with `apps/game`; the
+  lab's record / playback session (`apps/studio/src/labs/integration/session.ts`) also runs headless in the Studio's Node tests,
   including a soak of ten simulated minutes (`apps/studio/tests/integration-soak.test.ts`).
 - Diagnostics are measured by the host app around simulation calls; the simulation itself never
   reads clocks.
