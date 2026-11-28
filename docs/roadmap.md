@@ -68,7 +68,7 @@ composed session from its production package. A gap names the ticket that closes
 | Arena and parallax (M1.12)              | gap    | Placeholder arena drawn through the camera. No production arena package #226            |
 | Visual effects (M1.13)                  | done   | Spawned once per event, live and in playback                                            |
 | Audio (M1.14)                           | gap    | Cues trigger once per event. No reset for a restarted timeline #221                     |
-| Replay (M1.15)                          | gap    | Records and replays without desync. The player returns no events #220; options #216     |
+| Replay (M1.15)                          | gap    | Records and replays without desync; the player returns each tick's events. Options #216 |
 | Mesh deformation and skinning (M1.16)   | done   | Not part of the composition; covered by the Skeleton Lab                                |
 | Arena consistency (gameplay vs. visual) | done   | `integration-arena.test.ts`, for the placeholder arena only (#226)                      |
 | Determinism (soak, restore)             | done   | `integration-soak.test.ts`: 36,037 frames, 24 seeded restores, equal hashes and events  |
@@ -78,8 +78,6 @@ composed session from its production package. A gap names the ticket that closes
 
 Gaps, as orch tickets (`orch ticket show <id>`):
 
-- **#220** Replay player: return the simulation events of the ticks it runs. Playback cannot
-  drive effects, audio or shake without stepping every tick twice, as the lab does.
 - **#221** Audio player: explicit reset of the dedupe memory for a restarted timeline. The lab
   creates a new player and `AudioContext` per timeline.
 - **#222** Texture manifests: share one loaded manifest between several renderables. The lab
@@ -91,7 +89,7 @@ Gaps, as orch tickets (`orch ticket show <id>`):
 - **#216** (filed earlier) Replay: sessions created with `movement` or `arena` options cannot
   be recorded, so the lab's session uses the default movement parameters and arena.
 
-M2 combat work on the simulation side is not blocked by any of these. #220 and #222 should
+M2 combat work on the simulation side is not blocked by any of these. #222 should
 land before the M2 sandbox draws hits on two mannequins. The game screen already runs the
 composition (#224, `@mortal-doctrine/match-view`), with the placeholder fixture until #226.
 
