@@ -33,17 +33,15 @@ export function createArenaRenderable({
   viewportWidth,
   layer = 'background',
 }: ArenaRenderableOptions): ArenaRenderable {
-  let released = false;
+  // Not awaited: `loadTextureManifest` waits for a pending release of the same URL itself.
   const release = () => {
-    if (released) return;
-    released = true;
-    // Not awaited: `loadTextureManifest` waits for a pending release of the same URL itself.
     textures.release().catch((cause: unknown) => console.error(cause));
   };
 
   // Resolved before anything is created, so a missing texture leaves nothing behind.
-  const resolved = arena.layers.map(({ id, images }) => ({
+  const resolved = arena.layers.map(({ id, parallax, images }) => ({
     id,
+    parallax,
     images: images.map(({ texture: textureId, x, y }) => {
       const texture = textures.textures[textureId];
       if (!Object.hasOwn(textures.textures, textureId) || !texture) {
@@ -57,7 +55,7 @@ export function createArenaRenderable({
   const container = new Container({ label: `arena-${arena.id}` });
   // A layer container sits at the screen position of the layer's authored origin, scaled by the
   // view; its sprites keep their authored offsets in world units (= logical pixels at scale 1).
-  const layers = resolved.map(({ id, images }) => {
+  const layers = resolved.map(({ id, parallax, images }) => {
     const layerContainer = new Container({ label: id });
     for (const { textureId, texture, x, y } of images) {
       layerContainer.addChild(
@@ -71,30 +69,32 @@ export function createArenaRenderable({
         }),
       );
     }
-    return layerContainer;
+    container.addChild(layerContainer);
+    return { id, parallax, container: layerContainer };
   });
-  container.addChild(...layers);
+  let destroyed = false;
 
   return {
     layer,
     container,
     setLayerVisible(layerId, visible) {
-      const target = layers.find(({ label }) => label === layerId);
+      const target = layers.find(({ id }) => id === layerId);
       if (!target) {
-        const known = layers.map(({ label }) => label).join(', ');
+        const known = layers.map(({ id }) => id).join(', ');
         throw new Error(`Arena "${arena.id}" has no layer "${layerId}"; layers are: ${known}`);
       }
-      target.visible = visible;
+      target.container.visible = visible;
     },
     update({ view }: RenderFrame) {
-      arena.layers.forEach(({ parallax }, index) => {
+      for (const { parallax, container: layerContainer } of layers) {
         const origin = parallaxToScreen(view, viewportWidth, arena, parallax, 0, 0);
-        layers[index]?.position.set(origin.x, origin.y);
-        layers[index]?.scale.set(view.scale);
-      });
+        layerContainer.position.set(origin.x, origin.y);
+        layerContainer.scale.set(view.scale);
+      }
     },
     destroy() {
-      if (released) return;
+      if (destroyed) return;
+      destroyed = true;
       container.destroy({ children: true });
       release();
     },

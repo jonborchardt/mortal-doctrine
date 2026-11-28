@@ -67,9 +67,9 @@ export function ArenaLab() {
         renderer.register(arena);
         if (disposed) return;
 
-        let inputs: FrameInputs = PANS.hold.inputs;
-        let runner = createSimulationRunner();
-        let camera = createCamera(CONFIG);
+        let inputs: FrameInputs;
+        let runner: ReturnType<typeof createSimulationRunner>;
+        let camera: ReturnType<typeof createCamera>;
         // A fresh, paused runner at frame 0, a camera with no history and no pan.
         const load = () => {
           runner = createSimulationRunner();
