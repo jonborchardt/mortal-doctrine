@@ -19,7 +19,7 @@ other than `type`, rollback, wiring into `apps/game` (M1.18).
 | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `parseEffectDefinitions(json)`                                                     | Validates `EffectDefinition[]`; rejects malformed or duplicate ids and non-positive lifetimes, sizes and counts.            |
 | `parseEffectMapping(json, definitions)`                                            | Validates `{ [eventType]: { effect, offset?: { x, y } } }`; rejects an `effect` missing from `definitions`.                 |
-| `createEffectsRenderable({ definitions, mapping, layer? })`                        | The renderable (default layer `effects`). Validates both inputs and throws naming the field.                                |
+| `createEffectsRenderable({ definitions, mapping })`                                | The renderable, in the `effects` layer. Validates both inputs and throws naming the field.                                  |
 | `effects.update(frame)`                                                            | Called by the renderer: spawns effects for new mapped events and places every effect through `frame.view`.                  |
 | `effects.advance(elapsedMs)`                                                       | Ages every effect by host display time; an effect whose age reaches `lifetimeMs` is destroyed.                              |
 | `effects.clear()`                                                                  | Destroys every effect and forgets every spawned event, for a host-driven restore or seek.                                   |

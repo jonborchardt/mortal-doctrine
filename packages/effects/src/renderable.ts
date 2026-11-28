@@ -25,8 +25,6 @@ export interface ActiveEffect {
 export interface EffectsRenderableOptions {
   readonly definitions: readonly EffectDefinition[];
   readonly mapping: EffectMapping;
-  /** The renderer layer to mount in. Default `effects`. */
-  readonly layer?: string;
 }
 
 export interface EffectsRenderable extends Renderable {
@@ -116,7 +114,7 @@ export function createEffectsRenderable(options: EffectsRenderableOptions): Effe
   };
 
   return {
-    layer: options.layer ?? 'effects',
+    layer: 'effects',
     container,
     update({ state, events, view: frameView }) {
       if (destroyed) return;
