@@ -264,6 +264,9 @@ importers:
       '@mortal-doctrine/animation':
         specifier: workspace:*
         version: link:../../packages/animation
+      '@mortal-doctrine/arena':
+        specifier: workspace:*
+        version: link:../../packages/arena
       '@mortal-doctrine/audio':
         specifier: workspace:*
         version: link:../../packages/audio
@@ -344,6 +347,28 @@ importers:
         specifier: ^4.6.7
         version: 4.6.7
     devDependencies:
+      vitest:
+        specifier: ^5.1.2
+        version: 5.1.2(@types/node@24.19.4)(vite@8.3.8(@types/node@24.19.4)(jiti@2.7.0))
+
+  packages/arena:
+    dependencies:
+      '@mortal-doctrine/renderer':
+        specifier: workspace:*
+        version: link:../renderer
+      '@mortal-doctrine/sim-core':
+        specifier: workspace:*
+        version: link:../sim-core
+      pixi.js:
+        specifier: ^8.23.0
+        version: 8.23.0
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@mortal-doctrine/simulation':
+        specifier: workspace:*
+        version: link:../simulation
       vitest:
         specifier: ^5.1.2
         version: 5.1.2(@types/node@24.19.4)(vite@8.3.8(@types/node@24.19.4)(jiti@2.7.0))
