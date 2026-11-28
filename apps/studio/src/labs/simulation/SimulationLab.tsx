@@ -4,10 +4,10 @@ import {
   DEFAULT_PLAYER_BINDINGS,
   type InputCapture,
 } from '@mortal-doctrine/input';
-import { startHostLoop, type HostLoop } from '@mortal-doctrine/renderer';
 import { InputBit, TICK_RATE, type FrameInputs, type InputFrame } from '@mortal-doctrine/sim-core';
 import type { InitialStateOptions, SimulationEvent } from '@mortal-doctrine/simulation';
 import { createFixture, fixtureRecords, formatFixtureRecord } from './fixture-renderable';
+import { startSimLoop, type SimLoop } from './sim-loop';
 
 // Deterministic fixture the lab starts from and Reset returns to.
 const LAB_OPTIONS = { seed: 12345 } as const satisfies InitialStateOptions;
@@ -31,7 +31,7 @@ function keepGameplayKeys(event: KeyboardEvent<HTMLSelectElement>) {
 }
 
 interface Session {
-  readonly loop: HostLoop;
+  readonly loop: SimLoop;
   readonly players: readonly [InputCapture, InputCapture];
   /** Recent events, oldest first (shown newest first). Mutated by the loop and controls, never React state. */
   readonly log: SimulationEvent[];
@@ -102,7 +102,7 @@ export function SimulationLab() {
     const [width, height] = VIEWPORTS[viewport];
 
     // Per-frame work stays outside React; React only handles control clicks.
-    const loop = startHostLoop(host, {
+    const loop = startSimLoop(host, {
       inputs: () => sample(players),
       runner: LAB_OPTIONS,
       renderer: { width, height },

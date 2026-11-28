@@ -102,9 +102,9 @@ renderer.onFrame((elapsedMs) => {
 });
 ```
 
-`startHostLoop` calls its `onFrame` after `render`, so a camera driven from that callback trails
-the picture by one display frame; hosts that need the camera own their renderer and runner, as
-the Camera Lab does. The camera holds no resources: there is nothing to dispose.
+Call `setView` before `render` in the same frame callback, as above: a view set after `render`
+trails the picture by one display frame. Hosts own their renderer and frame callback, as the
+Camera Lab and `match-view` do. The camera holds no resources: there is nothing to dispose.
 
 ## Tests
 
