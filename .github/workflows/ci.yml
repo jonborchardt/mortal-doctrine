@@ -1,6 +1,6 @@
 name: CI
 
-# EXPERIMENT ONLY (never merge): does Windows Defender real-time scanning cause the e2e stalls?
+# EXPERIMENT ONLY (never merge): which test stalls the Windows runner?
 on:
   pull_request:
 
@@ -9,14 +9,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        defender: [on, off]
-        run: [1, 2, 3, 4, 5, 6, 7, 8]
+        variant:
+          - { name: no-camera-145, args: '--grep-invert "near framing at a bound"' }
+          - { name: no-effects, args: '--grep-invert "studio-effects"' }
+          - { name: only-camera-effects, args: 'studio-camera studio-effects' }
+          - { name: one-worker, args: '--workers=1' }
+        run: [1, 2, 3, 4, 5]
+    name: ${{ matrix.variant.name }} ${{ matrix.run }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
-      - if: matrix.defender == 'off'
-        shell: pwsh
-        run: Set-MpPreference -DisableRealtimeMonitoring $true; (Get-MpPreference).DisableRealtimeMonitoring
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
@@ -24,4 +26,4 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm test:e2e
+      - run: pnpm exec playwright test --reporter=list ${{ matrix.variant.args }}
