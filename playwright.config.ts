@@ -36,7 +36,14 @@ export default defineConfig({
   workers: Math.max(1, Math.min(3, Math.floor(availableParallelism() / 2))),
   forbidOnly: isCI,
   reporter: isCI ? [['github'], ['html', { open: 'never' }]] : 'list',
-  use: { trace: 'retain-on-failure', screenshot: 'only-on-failure' },
+  use: {
+    // No trace screencast: the Pixi labs redraw every display frame, so it never idles, and each
+    // frame is a SwiftShader readback, a JPEG encode and a file write in every worker. That load
+    // starved slow Windows runners until tests timed out. Failure traces keep DOM snapshots,
+    // network, console and sources; rerun with `--trace on` for a film strip.
+    trace: { mode: 'retain-on-failure', screenshots: false },
+    screenshot: 'only-on-failure',
+  },
   projects: apps.map(({ name, port }) => ({
     name,
     testMatch: `${name}*.spec.ts`,
