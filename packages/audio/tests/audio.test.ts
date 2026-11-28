@@ -183,6 +183,88 @@ describe('unlock', () => {
   });
 });
 
+describe('clear', () => {
+  it('plays the same events again with the same variations', () => {
+    const { context, player, unlock } = setup();
+    unlock();
+    player.play(FIXTURE_EVENTS);
+    const first = player.log;
+    player.clear();
+    expect(player.log).toEqual([]);
+    player.play(FIXTURE_EVENTS);
+    expect(started(context)).toBe(FIXTURE_EVENTS.length * 2);
+    expect(player.log).toEqual(first);
+  });
+
+  it.each([
+    ['inside', DEDUPE_WINDOW_FRAMES / 2],
+    ['beyond', DEDUPE_WINDOW_FRAMES * 3],
+  ])('replays a timeline restarted at frame 0 from %s the dedupe window', (_name, length) => {
+    const { context, player, unlock } = setup();
+    unlock();
+    const timeline = [land(0), land(1), land(length)];
+    player.play(timeline);
+    player.clear();
+    player.play(timeline);
+    expect(context.sources).toHaveLength(timeline.length * 2);
+  });
+
+  it('stops every playing voice, removes its listener and empties the log', () => {
+    const { context, player, unlock } = setup();
+    unlock();
+    player.play(FIXTURE_EVENTS);
+    context.sources[0]!.end();
+    player.clear();
+    expect(context.sources.map((source) => source.stopped)).toEqual([0, 1, 1, 1, 1, 1]);
+    expect(context.sources.every((source) => source.listeners.size === 0)).toBe(true);
+    expect(player.voices).toEqual([]);
+    expect(player.log).toEqual([]);
+  });
+
+  it('keeps the context, the unlocked state and the bus settings', () => {
+    const { context, gestureTarget, player, unlock } = setup();
+    unlock();
+    player.setVolume('sfx', 0.4);
+    player.setMuted('voice', true);
+    player.clear();
+    expect(player.state).toBe('unlocked');
+    expect(context.closeCalls).toBe(0);
+    expect(context.resumeCalls).toBe(1);
+    expect(gestureTarget.listenerCount).toBe(0);
+    expect(player.bus('sfx')).toEqual({ volume: 0.4, muted: false });
+    expect(player.bus('voice')).toEqual({ volume: 1, muted: true });
+    expect(context.gains.map((node) => node.gain.value)).toEqual([0.4, 0, 1]);
+    player.play([land(0)]);
+    expect(started(context)).toBe(1);
+  });
+
+  it('keeps a locked player locked until a gesture', () => {
+    const { context, gestureTarget, player, unlock } = setup();
+    player.clear();
+    expect(player.state).toBe('locked');
+    expect(gestureTarget.listenerCount).toBe(2);
+    player.play([land(0)]);
+    expect(context.sources).toHaveLength(0);
+    unlock();
+    expect(player.state).toBe('unlocked');
+    player.play([land(0)]);
+    expect(started(context)).toBe(1);
+  });
+
+  it('does nothing on a disposed player', () => {
+    const { context, player, unlock } = setup();
+    unlock();
+    player.play(FIXTURE_EVENTS);
+    player.dispose();
+    const log = player.log;
+    expect(() => player.clear()).not.toThrow();
+    expect(player.state).toBe('disposed');
+    expect(player.log).toEqual(log);
+    expect(context.closeCalls).toBe(1);
+    expect(context.sources.every((source) => source.stopped === 1)).toBe(true);
+  });
+});
+
 describe('dispose', () => {
   it('stops voices, removes listeners, closes the context and is idempotent', () => {
     const { context, gestureTarget, player, unlock } = setup();
