@@ -55,21 +55,21 @@ export const CAMERA_CONFIG: CameraConfig = {
 const { LEFT, RIGHT, UP, DOWN, A1, A2 } = InputBit;
 const SEGMENT_FRAMES = 12;
 /** One held input per segment; the quarter circle is spelled out over a segment's frames. */
-const ACTIONS: readonly ((phase: number) => InputFrame)[] = [
-  () => 0,
-  () => LEFT,
-  () => LEFT,
-  () => RIGHT,
-  () => RIGHT,
-  () => UP,
-  () => UP | LEFT,
-  () => UP | RIGHT,
-  () => DOWN,
-  () => A2,
+const ACTIONS: readonly (InputFrame | ((phase: number) => InputFrame))[] = [
+  0,
+  LEFT,
+  LEFT,
+  RIGHT,
+  RIGHT,
+  UP,
+  UP | LEFT,
+  UP | RIGHT,
+  DOWN,
+  A2,
   (phase) => (phase < 3 ? DOWN : phase < 6 ? DOWN | RIGHT : phase === 6 ? RIGHT | A1 : RIGHT),
 ];
 
-/** FNV-1a with a final avalanche, as the presentation packages use for their fixed choices. */
+/** FNV-1a with a final avalanche, over numbers. Audio and effects keep the same mix private. */
 function mix(...values: number[]): number {
   let h = 0x811c9dc5;
   for (const value of values) h = Math.imul(h ^ value, 0x01000193);
@@ -87,7 +87,7 @@ export function scriptedInputs(seed: number): InputProvider {
   const player = (index: number, frame: number): InputFrame => {
     const segment = Math.floor(frame / SEGMENT_FRAMES);
     const action = ACTIONS[mix(seed, index, segment) % ACTIONS.length]!;
-    return action(frame % SEGMENT_FRAMES);
+    return typeof action === 'function' ? action(frame % SEGMENT_FRAMES) : action;
   };
   return (frame) => [player(0, frame), player(1, frame)];
 }
@@ -97,7 +97,7 @@ const RAISE = loadClip(RAISE_STAFF);
 const REST: AnimatedPose = {};
 const CROUCH: AnimatedPose = { bones: { root: { scale: { x: 1, y: 0.6 } } } };
 
-export type FighterActivity = 'idle' | 'walk' | 'crouch' | 'air';
+type FighterActivity = 'idle' | 'walk' | 'crouch' | 'air';
 
 export function fighterActivity(fighter: FighterState): FighterActivity {
   if (!fighter.grounded) return 'air';
