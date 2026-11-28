@@ -51,17 +51,19 @@ test('keyboard input moves player one', async ({ page }) => {
   await page.keyboard.up('KeyA');
 });
 
-// The placeholder match at rest: the camera shows 800 world units across the 960 px canvas
-// (1.2 px per world unit), centred between the fighters at x = 240 and 720, ground line at
-// y = 460. A mannequin's body attachment is centred 130 world units above its feet.
+// The placeholder match at rest: the fighters' pushbox edges (210 and 750 world units) plus the
+// 80-unit margin a side, so the camera shows 700 world units across the 960 px canvas (960 / 700
+// = 1.3714 px per world unit), centred on x = 480 between the fighters at 240 and 720, ground
+// line at y = 460. A mannequin's body attachment is centred 130 world units above its feet:
+// x = 480 -/+ 240 x 1.3714 = 150.9 and 809.1, y = 460 - 130 x 1.3714 = 281.7.
 const GROUND: Rgb = [120, 84, 56];
 const BODY_PLAIN: Rgb = [0x4f, 0x8f, 0xd9];
 const BACKGROUND: Rgb = [0x15, 0x13, 0x1c];
 const AT_REST = [
   { point: { x: 480, y: 520 }, colour: GROUND },
-  { point: { x: 192, y: 304 }, colour: BODY_PLAIN },
-  { point: { x: 768, y: 304 }, colour: BODY_PLAIN },
-  { point: { x: 480, y: 304 }, colour: BACKGROUND },
+  { point: { x: 151, y: 282 }, colour: BODY_PLAIN },
+  { point: { x: 809, y: 282 }, colour: BODY_PLAIN },
+  { point: { x: 480, y: 282 }, colour: BACKGROUND },
 ];
 
 /**

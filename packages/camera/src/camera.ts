@@ -26,6 +26,11 @@ export interface CameraConfig {
   readonly maxVisibleWidth: number;
   /** Sub-units kept free between each outer pushbox edge and the frame edge, zoom permitting. */
   readonly margin: number;
+  /**
+   * Sub-units kept visible above every fighter's `y` (its feet): the view zooms out until that
+   * point is below the viewport top, zoom limits and bounds permitting.
+   */
+  readonly headroom: number;
   /** Logical pixels between the ground line and the viewport bottom, at every zoom. */
   readonly groundMargin: number;
   /** Fraction of the remaining distance covered per simulation frame, in (0, 1]; 1 = no smoothing. */
@@ -86,6 +91,7 @@ function assertConfig(config: CameraConfig): void {
       ? ''
       : 'minVisibleWidth: must be > 0 and at most maxVisibleWidth',
     margin >= 0 ? '' : 'margin: must be >= 0',
+    config.headroom >= 0 ? '' : 'headroom: must be >= 0',
     smoothing > 0 && smoothing <= 1 ? '' : 'smoothing: must be in (0, 1]',
     ...Object.entries(shake).map(([type, { amplitude, frames }]) =>
       amplitude >= 0 && Number.isInteger(frames) && frames > 0
@@ -123,7 +129,16 @@ export function createCamera(config: CameraConfig): Camera {
       if (output && state.frame === lastFrame) return output;
 
       const span = fighterSpan(state);
-      const targetWidth = clamp(span.right - span.left + 2 * margin, minWidth, maxWidth);
+      // The width at which the point `headroom` above the highest fighter is at the viewport top.
+      const fitWidth =
+        ((Math.max(...state.fighters.map((fighter) => fighter.y)) + config.headroom) *
+          viewport.width) /
+        (viewport.height - config.groundMargin);
+      const targetWidth = clamp(
+        Math.max(span.right - span.left + 2 * margin, fitWidth),
+        minWidth,
+        maxWidth,
+      );
       const targetCentre = withinBounds((span.left + span.right) / 2, targetWidth);
       const steps = lastFrame === undefined ? -1 : state.frame - lastFrame;
       if (lastFrame === undefined || steps < 0 || steps > MAX_CATCH_UP_FRAMES) {
@@ -136,8 +151,9 @@ export function createCamera(config: CameraConfig): Camera {
           centre = approach(centre, targetCentre);
           width = approach(width, targetWidth);
         }
-        // Smoothing may lag the margin, never a fighter: both pushboxes stay in frame.
-        width = Math.max(width, Math.min(span.right - span.left, maxWidth));
+        // Smoothing may lag the margin, never a fighter: both pushboxes and the headroom stay
+        // in frame.
+        width = Math.max(width, Math.min(Math.max(span.right - span.left, fitWidth), maxWidth));
         centre = withinBounds(
           Math.min(span.left + width / 2, Math.max(span.right - width / 2, centre)),
           width,

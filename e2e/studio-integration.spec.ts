@@ -24,8 +24,8 @@ const FIXTURE = {
 // The mannequins' body attachments at rest on the 960 px canvas, as in `game.spec.ts`.
 const BODY_PLAIN: Rgb = [0x4f, 0x8f, 0xd9];
 const BOTH_MANNEQUINS = [
-  { point: { x: 192, y: 304 }, colour: BODY_PLAIN },
-  { point: { x: 768, y: 304 }, colour: BODY_PLAIN },
+  { point: { x: 151, y: 282 }, colour: BODY_PLAIN },
+  { point: { x: 809, y: 282 }, colour: BODY_PLAIN },
 ];
 
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
@@ -121,6 +121,36 @@ test('fighters move on input, a jump triggers an effect and a cue, Reset restore
   await expectFixture(page);
   await expect(button(page, 'Play')).toBeEnabled();
   await expect(button(page, 'Play replay')).toBeDisabled();
+});
+
+test('the camera zooms out to keep a jumping fighter in frame', async ({ page }, testInfo) => {
+  // Twenty single steps of the whole composition, each waiting for its drawn frame.
+  test.slow();
+  await openLab(page);
+  const visibleWidth = async () =>
+    (await numberOf(page, 'camera-right')()) - (await numberOf(page, 'camera-left')());
+  // At rest: the fighters' span plus the margins.
+  await expect.poll(visibleWidth).toBe(70_000);
+
+  // Paused, so the jump is stepped tick by tick: 20 ticks reach its apex, 200 world units up.
+  await page.keyboard.down('KeyW');
+  for (let tick = 1; tick <= 20; tick++) {
+    await button(page, 'Step').click();
+    await expect(readout(page, 'frame')).toHaveText(String(tick));
+  }
+  await page.keyboard.up('KeyW');
+  await expect(readout(page, 'p1-state')).toHaveText('air');
+  await expect.poll(numberOf(page, 'p1-y')).toBeGreaterThan(19_000);
+  // 200 + 250 world units of headroom in the 460 px above the ground line: 450 x 960 / 460 =
+  // 939.13 world units across, around the fighters' midpoint at 480: inside the bounds.
+  await expect.poll(visibleWidth).toBeGreaterThan(70_000);
+  await expect(readout(page, 'camera-left')).toHaveText('1043');
+  await expect(readout(page, 'camera-right')).toHaveText('94957');
+  // Review evidence: the whole airborne mannequin, staff included, is below the top edge.
+  await page
+    .getByTestId('arena')
+    .locator('canvas')
+    .screenshot({ path: testInfo.outputPath('integration-lab-jump-apex.png') });
 });
 
 test('a recorded session replays to the same final frame, hash, effects and cues', async ({
