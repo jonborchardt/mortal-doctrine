@@ -19,6 +19,7 @@
     "@mortal-doctrine/audio": "workspace:*",
     "@mortal-doctrine/camera": "workspace:*",
     "@mortal-doctrine/commands": "workspace:*",
+    "@mortal-doctrine/effects": "workspace:*",
     "@mortal-doctrine/input": "workspace:*",
     "@mortal-doctrine/math": "workspace:*",
     "@mortal-doctrine/movement": "workspace:*",

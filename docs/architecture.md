@@ -26,14 +26,14 @@ future milestones, not yet built). Decision records live in [decisions/](decisio
 
 ## Layers — Implemented (enforced)
 
-| #   | Layer          | Contains                                                        | Today                                                       |
-| --- | -------------- | --------------------------------------------------------------- | ----------------------------------------------------------- |
-| 1   | `foundation`   | math primitives, narrowly scoped shared contracts               | `sim-core`, `math`                                          |
-| 2   | `simulation`   | headless gameplay: state, stepping, movement, collision, combat | `simulation`, `commands`, `movement`, `replay`              |
-| 3   | `animation`    | presentation-independent skeleton and animation evaluation      | `rig`, `animation`                                          |
-| 4   | `presentation` | rendering, effects, camera, audio, browser device adapters      | `renderer`, `skeleton-renderer`, `input`, `camera`, `arena` |
-| 5   | `content`      | `characters/*`, `arenas/*`                                      | —                                                           |
-| 6   | `application`  | `apps/*` composition and tooling                                | `game`, `studio`                                            |
+| #   | Layer          | Contains                                                        | Today                                                                  |
+| --- | -------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| 1   | `foundation`   | math primitives, narrowly scoped shared contracts               | `sim-core`, `math`                                                     |
+| 2   | `simulation`   | headless gameplay: state, stepping, movement, collision, combat | `simulation`, `commands`, `movement`, `replay`                         |
+| 3   | `animation`    | presentation-independent skeleton and animation evaluation      | `rig`, `animation`                                                     |
+| 4   | `presentation` | rendering, effects, camera, audio, browser device adapters      | `renderer`, `skeleton-renderer`, `input`, `camera`, `arena`, `effects` |
+| 5   | `content`      | `characters/*`, `arenas/*`                                      | —                                                                      |
+| 6   | `application`  | `apps/*` composition and tooling                                | `game`, `studio`                                                       |
 
 A package declares its layer in `package.json`:
 
@@ -314,6 +314,14 @@ back to front in one renderer layer, shifting each horizontally by its factor fo
 stay in `movement`; no arena content package exists and it is not wired into `apps/game` yet.
 See the package README.
 
+**Effects (implemented, `@mortal-doctrine/effects`).** Zod-validated effect definitions
+(`core/<name>` or `<character>/<name>`; placeholder `sprite` or `particles`) and an event-type →
+effect mapping drive a renderable in the `effects` layer. It spawns each event identity once, at
+the event's fighter in the drawn snapshot, ages effects only by host-supplied display time
+(`advance`) and destroys them on expiry; a backwards snapshot frame or `clear()` destroys every
+effect and forgets the spawned identities, so a re-simulation after a restore shows each effect
+once. It is not wired into `apps/game` yet. See the package README.
+
 The 960×540 viewport and the 2× texture resolution are **defaults, not architectural
 constraints**. No code may assume the logical viewport equals the arena width.
 
@@ -343,5 +351,5 @@ Constraints, Camera and Arena Labs exist. See [development.md](development.md#ad
 Combat, hitboxes, combos, special moves, skeletal animation, characters,
 arenas, effects, audio, AI, menus, settings, persistence, networking, rollback.
 (The seeded RNG, simulation events, gamepad input, replays, opt-in render interpolation,
-movement with jumping and pushbox collision, skeletal animation, the camera and the arena parallax engine (placeholder fixture only) now exist;
+movement with jumping and pushbox collision, skeletal animation, the camera, the arena parallax engine (placeholder fixture only) and the effects engine (placeholder effects only) now exist;
 see above.)
