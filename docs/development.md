@@ -166,6 +166,6 @@ budget. The frame now holds the arena layers, two skeletal renderables, 3 to 6 a
 the camera, audio triggers and about twenty DOM readouts. Caveats: each sample is one display
 frame's value read once a second while a script held the keys, not an average; the browser
 coarsens `performance.now()` to 0.1 ms, so the simulation figure is at the resolution limit;
-GPU time is not included; replay playback steps every tick twice (ticket #220), so its
-simulation time is about double; the soak time includes a state hash per tick, which costs more
+GPU time is not included; when measured, replay playback stepped every tick twice, so its
+simulation time was about double (fixed since by ticket #220; not re-measured); the soak time includes a state hash per tick, which costs more
 than the tick itself. One desktop's numbers say nothing about lower-end hardware.

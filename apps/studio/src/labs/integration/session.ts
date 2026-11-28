@@ -16,7 +16,6 @@ import {
 import { InputBit, type InputFrame } from '@mortal-doctrine/sim-core';
 import {
   createSimulationRunner,
-  step,
   type InputProvider,
   type SimulationRunner,
   type SimulationState,
@@ -62,23 +61,6 @@ export function scriptedInputs(seed: number): InputProvider {
   return (frame) => [player(0, frame), player(1, frame)];
 }
 
-/**
- * The events of the `count` replay ticks after `from`, found by stepping again: the replay
- * player re-simulates but does not hand out the events (ticket #220).
- */
-export function replayTicks(replay: Replay, from: SimulationState, count: number): Tick[] {
-  const ticks: Tick[] = [];
-  let state = from;
-  for (let i = 0; i < count; i++) {
-    const inputs = replay.inputs[state.frame];
-    if (!inputs) break;
-    const result = step(state, inputs);
-    state = result.state;
-    ticks.push(result);
-  }
-  return ticks;
-}
-
 /** The last frame of a recording, or of its playback. */
 export interface FinalFrame {
   readonly frame: number;
@@ -98,9 +80,9 @@ export interface Session {
   readonly desync: ReplayDesync | null;
   setPaused(paused: boolean): void;
   /** Feeds host display time; returns the ticks run, oldest first. */
-  advance(elapsedMs: number): Tick[];
+  advance(elapsedMs: number): readonly Tick[];
   /** Runs one tick regardless of pause. */
-  step(): Tick[];
+  step(): readonly Tick[];
   /** Restarts from the fixture, running, recording every tick. */
   record(): void;
   /** Ends the recording and pauses on its last frame. */
@@ -140,9 +122,7 @@ export function createSession(inputs: InputProvider): Session {
     hash: hashState(state),
   });
 
-  const playback = (current: ReplayPlayer, run: () => number): Tick[] => {
-    const from = current.state;
-    const ticks = replay ? replayTicks(replay, from, run()) : [];
+  const playback = (current: ReplayPlayer, ticks: readonly Tick[]): readonly Tick[] => {
     if (!played && current.frame === current.length && !current.desync)
       played = final(current.state);
     return ticks;
@@ -179,14 +159,13 @@ export function createSession(inputs: InputProvider): Session {
     advance(elapsedMs) {
       const current = player;
       return current
-        ? playback(current, () => current.advance(elapsedMs))
+        ? playback(current, current.advance(elapsedMs))
         : live.run(() => runner.advance(elapsedMs, provider).events);
     },
     step() {
-      const current = player;
-      return current
-        ? playback(current, () => Number(current.stepOnce()))
-        : live.run(() => runner.stepOnce(provider));
+      if (!player) return live.run(() => runner.stepOnce(provider));
+      const tick = player.stepOnce();
+      return playback(player, tick ? [tick] : []);
     },
     record: () => start(true),
     stop() {

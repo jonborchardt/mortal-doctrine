@@ -39,15 +39,15 @@ accidental edits, not deliberate forgery.
 
 ## API
 
-| Export                                                                   | Purpose                                                                                                                                                    |
-| ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `replaySchema`, `Replay`                                                 | Zod schema and types of the format                                                                                                                         |
-| `REPLAY_VERSION`                                                         | `1`                                                                                                                                                        |
-| `serializeReplay(replay)` / `deserializeReplay(json)`                    | JSON export and import. Import throws on text that is not JSON, an unknown `replayVersion` (naming found and supported) and schema failures (naming paths) |
-| `hashState(state)`                                                       | Deterministic hash of `serializeState(state)`                                                                                                              |
-| `createReplayRecorder({ options?, checksumInterval?, getState })`        | Recorder: `length`, `provider(inner)`, `finish()`. `checksumInterval` defaults to `60`                                                                     |
-| `createReplayPlayer(replay)`                                             | Player: `state`, `frame`, `length`, `paused`, `desync`, `play()`, `pause()`, `advance(elapsedMs)`, `stepOnce()`, `seek(frame)`                             |
-| `ReplayRecorder`, `ReplayRecorderConfig`, `ReplayPlayer`, `ReplayDesync` | Their types                                                                                                                                                |
+| Export                                                                   | Purpose                                                                                                                                                                                                               |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `replaySchema`, `Replay`                                                 | Zod schema and types of the format                                                                                                                                                                                    |
+| `REPLAY_VERSION`                                                         | `1`                                                                                                                                                                                                                   |
+| `serializeReplay(replay)` / `deserializeReplay(json)`                    | JSON export and import. Import throws on text that is not JSON, an unknown `replayVersion` (naming found and supported) and schema failures (naming paths)                                                            |
+| `hashState(state)`                                                       | Deterministic hash of `serializeState(state)`                                                                                                                                                                         |
+| `createReplayRecorder({ options?, checksumInterval?, getState })`        | Recorder: `length`, `provider(inner)`, `finish()`. `checksumInterval` defaults to `60`                                                                                                                                |
+| `createReplayPlayer(replay)`                                             | Player: `state`, `frame`, `length`, `paused`, `desync`, `play()`, `pause()`, `advance(elapsedMs)`, `stepOnce()`, `seek(frame)`. `advance` returns `StepResult[]`, `stepOnce` a `StepResult` or `null`, `seek` nothing |
+| `ReplayRecorder`, `ReplayRecorderConfig`, `ReplayPlayer`, `ReplayDesync` | Their types                                                                                                                                                                                                           |
 
 ## Recording
 
@@ -83,10 +83,17 @@ Call protocol:
 ```ts
 const player = createReplayPlayer(deserializeReplay(json)); // paused at frame 0
 player.play();
-player.advance(elapsedMs); // from the host's frame loop; whole 60 Hz ticks, stops at the end
-player.seek(120); // re-simulates from frame 0 when seeking backwards
-render(player.state);
+const ticks = player.advance(elapsedMs); // from the host's frame loop; whole 60 Hz ticks, stops at the end
+player.seek(120); // re-simulates from frame 0 when seeking backwards; returns no events
+render(player.state, ticks);
 ```
+
+`advance` returns the `StepResult` (`{ state, events }`) of each tick it ran, oldest first: the
+values `step` produced, unchanged. It returns `[]` while paused or when no whole tick accrued.
+`stepOnce` returns its tick's `StepResult`, or `null` at the end or at a desync. **`seek` returns
+no events**, forwards or backwards: a seek is a jump, not playback, so a host that seeks resets
+or re-anchors its presentation (effects clear on a lower frame, audio dedupes). The ticks played
+after a seek come from `advance` and `stepOnce` as usual.
 
 Whenever the player reaches a checksum frame it recomputes both hashes. If either differs from
 the recorded one, `desync` becomes `{ frame, expected, actual }`, the player pauses on that
