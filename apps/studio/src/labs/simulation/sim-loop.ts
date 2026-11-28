@@ -6,10 +6,14 @@ import {
   type SimulationRunner,
   type SimulationState,
 } from '@mortal-doctrine/simulation';
-import { createArenaRenderer, type ArenaRenderer, type ArenaRendererOptions } from './renderer';
+import {
+  createArenaRenderer,
+  type ArenaRenderer,
+  type ArenaRendererOptions,
+} from '@mortal-doctrine/renderer';
 
 /** Passed to the host's per-frame callback after the simulation advanced and the frame was drawn. */
-export interface HostFrame {
+export interface SimFrame {
   readonly elapsedMs: number;
   /** Ticks run by `advance` this frame (excludes `stepOnce`). */
   readonly ticks: number;
@@ -19,17 +23,17 @@ export interface HostFrame {
   readonly state: SimulationState;
 }
 
-export interface HostLoopOptions {
+export interface SimLoopOptions {
   /** Called once per tick for that tick's inputs. */
   readonly inputs: InputProvider;
-  readonly onFrame?: (frame: HostFrame) => void;
+  readonly onFrame?: (frame: SimFrame) => void;
   readonly renderer?: ArenaRendererOptions;
   readonly runner?: InitialStateOptions;
   /** Blend placeholder fighters between the previous and current snapshot. Default false. */
   readonly interpolate?: boolean;
 }
 
-export interface HostLoop {
+export interface SimLoop {
   /** Resolves once the renderer exists and frames run; rejects if it could not be created. */
   readonly ready: Promise<void>;
   readonly runner: SimulationRunner;
@@ -43,8 +47,11 @@ export interface HostLoop {
   destroy(): void;
 }
 
-/** Owns a renderer, a simulation runner and the display-frame subscription that drives both. */
-export function startHostLoop(host: HTMLElement, options: HostLoopOptions): HostLoop {
+/**
+ * The Simulation Lab's frame loop: owns a renderer, a simulation runner and the display-frame
+ * subscription that drives both. Hosts that need a camera or replay use `match-view` instead.
+ */
+export function startSimLoop(host: HTMLElement, options: SimLoopOptions): SimLoop {
   const runner = createSimulationRunner(options.runner);
   let renderer: ArenaRenderer | undefined;
   let destroyed = false;
@@ -57,7 +64,7 @@ export function startHostLoop(host: HTMLElement, options: HostLoopOptions): Host
     return options.inputs(frame);
   };
 
-  const loop: HostLoop = {
+  const loop: SimLoop = {
     ready: createArenaRenderer(host, options.renderer).then((created) => {
       if (destroyed) return created.destroy();
       renderer = created;

@@ -60,7 +60,7 @@ composed session from its production package. A gap names the ticket that closes
 | Math primitives (M1.04)                 | done   | Used through `rig`, `animation` and `skeleton-renderer`                                 |
 | Movement and pushboxes (M1.05)          | done   | Walk, jump, crouch and wall contact in the soak                                         |
 | Skeletal rig (M1.06)                    | done   | Two `MANNEQUIN_RIG` instances                                                           |
-| Rendering infrastructure (M1.07)        | gap    | Layers and renderables work. Shared textures #222, host loop #223                       |
+| Rendering infrastructure (M1.07)        | gap    | Layers and renderables work. Hosts own the frame loop. Shared textures #222             |
 | Skeletal animation (M1.08)              | done   | Fixture clips sampled per snapshot. The state-to-clip mapping is lab-local placeholder  |
 | IK and pose constraints (M1.09)         | done   | Not part of the composition; covered by its own lab and tests                           |
 | Skeletal rendering (M1.10)              | gap    | Draws both mannequins. Two renderables cannot share a manifest #222                     |
@@ -80,8 +80,6 @@ Gaps, as orch tickets (`orch ticket show <id>`):
 
 - **#222** Texture manifests: share one loaded manifest between several renderables. The lab
   hands one mannequin a non-releasing copy of the other's textures.
-- **#223** Host loop: support a camera view before render and a replay player as the state
-  source. The lab cannot use `startHostLoop` and owns its renderer and frame callback.
 - **#226** Arena content: a production arena package checked against its gameplay rules.
 - **#219** Animation Lab: draw with the Pixi skeletal renderer (deferred from M1.18).
 - **#216** (filed earlier) Replay: sessions created with `movement` or `arena` options cannot

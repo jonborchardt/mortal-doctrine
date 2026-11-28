@@ -155,7 +155,7 @@ DOM-free `tsconfig` (copy `packages/simulation`); the determinism rules then app
   and capacity) and keeps the pause flag. The runner exposes no other way to change state.
 - `runner.alpha` is the fraction of a tick accumulated but not yet run, in [0, 1) (0 while
   paused). Rendering may interpolate between the snapshot one tick before the current one and
-  the current one by `alpha` (implemented, opt-in: `startHostLoop({ interpolate })`, placeholder
+  the current one by `alpha` (implemented, opt-in: `render(state, { previous, alpha })`, placeholder
   fighter x only; the Simulation Lab can toggle it, the game does not enable it). The blend snaps
   to the current snapshot unless the previous one is exactly one frame behind (reset, seek).
   Interpolation is presentation only and never feeds back into the simulation.
@@ -286,9 +286,9 @@ and never mutates simulation state. Other presentation packages extend it withou
   textures through Pixi `Assets` at a per-call resolution (default 2×). Each call returns its own
   handle with a release function; handles on the same URL are counted and share one texture (so
   one resolution), which is unloaded when the last handle is released.
-- **Host loop:** `startHostLoop` owns renderer + runner + frame subscription for the Simulation
-  Lab (the Replay, Command and Input Labs keep their own setup; the game and the Integration Lab
-  use `match-view`, see #223).
+- **Frame loops belong to hosts:** the renderer exposes `onFrame`, `setView` and `render` and
+  ships no loop. The Simulation Lab owns its renderer and frame loop in lab-local code (as do the
+  Replay, Command and Input Labs); the game and the Integration Lab use `match-view`.
 
 `@mortal-doctrine/skeleton-renderer` is the first such package: a registered renderable that
 draws a rig with one sprite per attachment-bearing slot. The caller supplies the pose, facing and
