@@ -183,6 +183,12 @@ export interface AudioPlayer {
   readonly voices: readonly ActiveVoice[];
   /** Triggered cues, oldest first, at most `TRIGGERED_LOG_LIMIT`. */
   readonly log: readonly TriggeredCue[];
+  /**
+   * Starts a new timeline (replay, rematch, reset to frame 0): forgets every played event
+   * identity, stops the playing voices and empties `log`. Keeps the context, `state`, bus volume
+   * and mute. Does nothing on a disposed player.
+   */
+  clear(): void;
   /** Stops voices, removes listeners and closes the context. Idempotent. */
   dispose(): void;
 }
@@ -250,6 +256,14 @@ export function createAudioPlayer(options: AudioPlayerOptions): AudioPlayer {
     source.start();
   };
 
+  const stopVoices = () => {
+    for (const { source, onEnded } of voices) {
+      source.removeEventListener('ended', onEnded);
+      source.stop();
+    }
+    voices = [];
+  };
+
   return {
     get state() {
       return state;
@@ -301,15 +315,18 @@ export function createAudioPlayer(options: AudioPlayerOptions): AudioPlayer {
     get log() {
       return [...log];
     },
+    clear() {
+      if (state === 'disposed') return;
+      played.clear();
+      newestFrame = -Infinity;
+      stopVoices();
+      log.length = 0;
+    },
     dispose() {
       if (state === 'disposed') return;
       state = 'disposed';
       removeGestureListeners();
-      for (const { source, onEnded } of voices) {
-        source.removeEventListener('ended', onEnded);
-        source.stop();
-      }
-      voices = [];
+      stopVoices();
       context.close().catch(() => undefined);
     },
   };

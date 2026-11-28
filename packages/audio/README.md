@@ -20,6 +20,7 @@ production sounds, queueing events that arrive while locked, matching on event f
 | `player.setVolume(bus, 0..1)` / `player.setMuted(bus, bool)`   | Set the bus gain immediately (clamped to 0..1). Muted gain is 0; unmuting restores the last volume. `player.bus(bus)` reads both.        |
 | `player.voices`                                                | Playing voices `{ cue, bus }`, oldest first; a voice leaves when its source ends.                                                        |
 | `player.log`                                                   | Triggered cues `{ frame, type, cue, variation }`, oldest first, last 64.                                                                 |
+| `player.clear()`                                               | Starts a new timeline: forgets every played identity, stops voices, empties `log`. Keeps the context, `state`, volume and mute.          |
 | `player.dispose()`                                             | Stops voices, removes gesture and `ended` listeners, closes the context. Idempotent.                                                     |
 | `parseCueRegistry(json)`                                       | Validates `CueDefinition[]` `{ id, bus: 'sfx'\|'voice'\|'music', variations: soundId[], events: type[] }`; rejects duplicate ids.        |
 | `parseSoundManifest(json, manifestUrl)`                        | Validates `{ schemaVersion: 1, sounds: { id: path } }` (relative, forward slashes, no `..`) and returns id → absolute URL.               |
@@ -36,6 +37,11 @@ identical events in the same `play` call (the simulation's event order is determ
 identity already played is never played again, so feeding the same events after a restore,
 seek or replay is silent. Keys whose frame is more than **`DEDUPE_WINDOW_FRAMES` (600, 10 s)**
 before the newest frame seen are forgotten; a rewind further back than that replays its cues.
+
+A timeline that starts again (replay, rematch, reset to frame 0) repeats identities on purpose:
+call `player.clear()` first, or what it sounds like depends on its length. `clear()` forgets
+every played identity, stops the playing voices and empties `log`; the context, the unlocked
+state, bus volume and mute are kept. On a disposed player it does nothing.
 
 The variation of a multi-variation cue is a hash of the cue id and the event identity: the same
 event always picks the same sound. No `Math.random`.

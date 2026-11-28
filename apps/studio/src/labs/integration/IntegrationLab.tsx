@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { createAudioPlayer, type AudioPlayer } from '@mortal-doctrine/audio';
+import { createAudioPlayer } from '@mortal-doctrine/audio';
 import { visibleSpan } from '@mortal-doctrine/camera';
 import { createInputCapture, DEFAULT_PLAYER_BINDINGS } from '@mortal-doctrine/input';
 import { createPresenter, mountMatchStage, type Tick } from '@mortal-doctrine/match-view';
@@ -15,7 +15,6 @@ import { TICK_MS } from '@mortal-doctrine/sim-core';
 import { createSession, type FinalFrame, type Session } from './session';
 
 const { viewport } = CAMERA_CONFIG;
-const GESTURES = ['pointerdown', 'keydown'] as const;
 const CUE_LINES = 5;
 
 /** What the controls need to know; everything per-frame is written straight to the DOM. */
@@ -68,24 +67,11 @@ export function IntegrationLab() {
         // One sample per player per tick, as the simulation (and the recorder) receives it.
         const session = createSession(() => [captures[0].sample(), captures[1].sample()]);
 
-        // The audio player forgets nothing on request, so each timeline gets a new one, or the
-        // cues of a replayed frame would be deduplicated away (ticket #221). A new player is
-        // locked until a gesture: the page's gestures are relayed to it, the first one at once.
-        const gestures = new EventTarget();
-        let unlocked = false;
-        const relayGesture = () => {
-          unlocked = true;
-          gestures.dispatchEvent(new Event('pointerdown'));
-        };
-        for (const type of GESTURES) window.addEventListener(type, relayGesture);
-        const createAudio = () => {
-          const context = new AudioContext();
-          const player = createAudioPlayer({ ...toneAudio(context), gestureTarget: gestures });
-          if (unlocked) gestures.dispatchEvent(new Event('pointerdown'));
-          return player;
-        };
-
-        let audio: AudioPlayer | undefined;
+        // One player for the lab's lifetime, cleared for each new timeline.
+        const audio = createAudioPlayer({
+          ...toneAudio(new AudioContext()),
+          gestureTarget: window,
+        });
         let presenter: ReturnType<typeof createPresenter>;
         // Ticks run by Step, presented with the next display frame.
         let pending: Tick[] = [];
@@ -94,10 +80,8 @@ export function IntegrationLab() {
         let lastEffect = '—';
         /** A new timeline from the fixture: nothing presented before it carries over. */
         const restart = () => {
-          audio?.dispose();
-          audio = createAudio();
-          const player = audio;
-          presenter = createPresenter({ ...PRESENTATION, audio: player, draw: stage.draw });
+          audio.clear();
+          presenter = createPresenter({ ...PRESENTATION, audio, draw: stage.draw });
           effects.clear();
           spawned.clear();
           lastEffect = '—';
@@ -189,8 +173,8 @@ export function IntegrationLab() {
           write('effects-active', String(effects.active.length));
           write('effects-spawned', String(spawned.size));
           write('effects-last', lastEffect);
-          const log = audio?.log ?? [];
-          write('audio-state', audio?.state ?? '—');
+          const { log } = audio;
+          write('audio-state', audio.state);
           write('cues', String(log.length));
           write(
             'cue-log',
@@ -222,9 +206,8 @@ export function IntegrationLab() {
         setReady(true);
         teardown = () => {
           unsubscribe();
-          for (const type of GESTURES) window.removeEventListener(type, relayGesture);
           for (const capture of captures) capture.dispose();
-          audio?.dispose();
+          audio.dispose();
           actionsRef.current = null;
         };
       })
