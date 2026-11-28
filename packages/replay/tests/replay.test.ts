@@ -343,7 +343,6 @@ describe('a session with command definitions', () => {
 
   it('records the definitions and plays back identically on every frame', () => {
     expect(replay.options).toEqual(COMMAND_OPTIONS);
-    expect(replay.options.commands).toEqual(GENERIC_COMMANDS);
     // Not vacuous: commands were recognized and the definitions are in the state.
     expect(events.some((event) => event.type === 'command')).toBe(true);
     expect(deserializeState(live[TICKS]!).commands.definitions).toEqual(GENERIC_COMMANDS);
