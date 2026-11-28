@@ -3,6 +3,7 @@
 import type { RigData } from '@mortal-doctrine/rig';
 import { defineClip, key, type ClipData } from './clip';
 import type { ConstraintsData } from './constraint';
+import type { MeshData } from './mesh';
 
 /** Ease in and out. Its x is linear in the curve parameter, so y(u) = 3u² - 2u³ exactly. */
 export const SMOOTH = { bezier: [1 / 3, 0, 2 / 3, 1] } as const;
@@ -322,5 +323,238 @@ export const INVALID_CONSTRAINTS: readonly {
     name: 'an unknown constraint type',
     data: withConstraint({ type: 'spring', bone: 'tip' }),
     message: 'constraints.constraints.0.type',
+  },
+];
+
+/**
+ * A two-bone limb lying along +x at height 100: `upper` from (-60, 100) to the joint at (0, 100),
+ * `lower` from the joint to (60, 100). Its one slot, `limb`, shows the mesh attachment
+ * `limb-skin` ({@link LIMB_MESH}).
+ */
+export const LIMB_RIG: RigData = {
+  schemaVersion: 1,
+  id: 'limb',
+  bones: [
+    {
+      id: 'upper',
+      translation: { x: -60, y: 100 },
+      rotation: 0,
+      scale: { x: 1, y: 1 },
+      length: 60,
+    },
+    {
+      id: 'lower',
+      parent: 'upper',
+      translation: { x: 60, y: 0 },
+      rotation: 0,
+      scale: { x: 1, y: 1 },
+      length: 60,
+    },
+  ],
+  slots: [{ id: 'limb', bone: 'upper', drawOrder: 0, attachment: 'limb-skin' }],
+  attachments: [{ id: 'limb-skin', slot: 'limb' }],
+  anchors: [],
+};
+
+/** Columns of the limb strip: x, then the `upper` weight (`lower` gets the rest). */
+const LIMB_COLUMNS = [
+  [-60, 1],
+  [-10, 0.75],
+  [0, 0.5],
+  [10, 0.25],
+  [60, 0],
+] as const;
+
+const limbWeights = (upper: number) =>
+  [
+    ...(upper > 0 ? [{ bone: 'upper', weight: upper }] : []),
+    ...(upper < 1 ? [{ bone: 'lower', weight: 1 - upper }] : []),
+  ] as const;
+
+/**
+ * A quad strip 20 units thick along both `LIMB_RIG` bones, in rig space at rest: column `c` (see
+ * the x values below) has vertex `2c` on top (y 110) and `2c + 1` below (y 90). Columns at
+ * x -60, -10, 0, 10 and 60 are weighted to `upper` 1, 0.75, 0.5, 0.25 and 0; the rest goes to
+ * `lower`. Eight triangles, two per gap between columns.
+ */
+export const LIMB_MESH: MeshData = {
+  schemaVersion: 1,
+  attachment: 'limb-skin',
+  vertices: LIMB_COLUMNS.flatMap(([x, upper]) =>
+    [110, 90].map((y) => ({
+      position: { x, y },
+      uv: { x: (x + 60) / 120, y: y === 110 ? 0 : 1 },
+      weights: limbWeights(upper),
+    })),
+  ),
+  triangles: LIMB_COLUMNS.slice(1).flatMap((_, c) => [
+    [2 * c, 2 * c + 1, 2 * c + 2] as const,
+    [2 * c + 1, 2 * c + 3, 2 * c + 2] as const,
+  ]),
+};
+
+type MeshVertex = MeshData['vertices'][number];
+const withVertex = (index: number, patch: Partial<MeshVertex>) => ({
+  ...LIMB_MESH,
+  vertices: LIMB_MESH.vertices.map((vertex, i) => (i === index ? { ...vertex, ...patch } : vertex)),
+});
+const withTriangle = (triangle: readonly unknown[]) => ({
+  ...LIMB_MESH,
+  triangles: [triangle, ...LIMB_MESH.triangles.slice(1)],
+});
+
+/** `LIMB_RIG` with a zero x scale on `lower`, so its rest world transform has no inverse. */
+const FLAT_LOWER_RIG: RigData = {
+  ...LIMB_RIG,
+  bones: LIMB_RIG.bones.map((bone) =>
+    bone.id === 'lower' ? { ...bone, scale: { x: 0, y: 1 } } : bone,
+  ),
+};
+
+/**
+ * Meshes `loadMesh(loadRig(rig), data)` must reject: `LIMB_MESH` with one defect each. `message`
+ * is a fragment of the expected error naming the problem.
+ */
+export const INVALID_MESHES: readonly {
+  readonly name: string;
+  readonly rig: RigData;
+  readonly data: unknown;
+  readonly message: string;
+}[] = [
+  {
+    name: 'an unknown schemaVersion',
+    rig: LIMB_RIG,
+    data: { ...LIMB_MESH, schemaVersion: 2 },
+    message: 'Unsupported mesh schemaVersion 2; supported: 1',
+  },
+  {
+    name: 'a mistyped field',
+    rig: LIMB_RIG,
+    data: withVertex(0, { position: { x: '-60', y: 110 } as unknown as MeshVertex['position'] }),
+    message: 'mesh.vertices.0.position.x',
+  },
+  {
+    name: 'a missing field',
+    rig: LIMB_RIG,
+    data: { schemaVersion: 1, attachment: 'limb-skin', vertices: LIMB_MESH.vertices },
+    message: 'mesh.triangles',
+  },
+  {
+    name: 'an unknown attachment',
+    rig: LIMB_RIG,
+    data: { ...LIMB_MESH, attachment: 'limb-scaly' },
+    message: 'unknown attachment "limb-scaly" of rig "limb"',
+  },
+  {
+    name: 'an unknown bone',
+    rig: LIMB_RIG,
+    data: withVertex(0, { weights: [{ bone: 'tail', weight: 1 }] }),
+    message: 'vertex 0 names unknown bone "tail" of rig "limb"',
+  },
+  {
+    name: 'a bone whose rest world transform is not invertible (zero rest scale)',
+    rig: FLAT_LOWER_RIG,
+    data: LIMB_MESH,
+    message: 'vertex 2 is weighted to bone "lower", whose rest world transform is not invertible',
+  },
+  {
+    name: 'a duplicate bone in one vertex',
+    rig: LIMB_RIG,
+    data: withVertex(4, {
+      weights: [
+        { bone: 'upper', weight: 0.5 },
+        { bone: 'upper', weight: 0.5 },
+      ],
+    }),
+    message: 'vertex 4 names bone "upper" twice',
+  },
+  {
+    name: 'more than 4 influences',
+    rig: LIMB_RIG,
+    data: withVertex(4, {
+      weights: [0.2, 0.2, 0.2, 0.2, 0.2].map((weight) => ({ bone: 'upper', weight })),
+    }),
+    message: 'vertex 4 has 5 weights, at most 4 allowed',
+  },
+  {
+    name: 'a negative weight',
+    rig: LIMB_RIG,
+    data: withVertex(4, {
+      weights: [
+        { bone: 'upper', weight: 1.5 },
+        { bone: 'lower', weight: -0.5 },
+      ],
+    }),
+    message: 'vertex 4 weight -0.5 for bone "lower" is not positive',
+  },
+  {
+    name: 'a zero weight',
+    rig: LIMB_RIG,
+    data: withVertex(0, {
+      weights: [
+        { bone: 'upper', weight: 1 },
+        { bone: 'lower', weight: 0 },
+      ],
+    }),
+    message: 'vertex 0 weight 0 for bone "lower" is not positive',
+  },
+  {
+    name: 'unnormalized weights',
+    rig: LIMB_RIG,
+    data: withVertex(4, {
+      weights: [
+        { bone: 'upper', weight: 0.5 },
+        { bone: 'lower', weight: 0.49 },
+      ],
+    }),
+    message: 'vertex 4 weights sum to 0.99, not 1 (tolerance 0.000001)',
+  },
+  {
+    name: 'a vertex with no weights',
+    rig: LIMB_RIG,
+    data: withVertex(3, { weights: [] }),
+    message: 'vertex 3 has no weights',
+  },
+  {
+    name: 'a uv outside [0, 1]',
+    rig: LIMB_RIG,
+    data: withVertex(9, { uv: { x: 1.25, y: 1 } }),
+    message: 'vertex 9 uv (1.25, 1) is outside [0, 1]',
+  },
+  {
+    name: 'an out-of-range triangle index',
+    rig: LIMB_RIG,
+    data: withTriangle([0, 1, 10]),
+    message: 'triangle 0 index 10 is not a vertex index (integer in [0, 9])',
+  },
+  {
+    name: 'a negative triangle index',
+    rig: LIMB_RIG,
+    data: withTriangle([0, -1, 2]),
+    message: 'triangle 0 index -1 is not a vertex index',
+  },
+  {
+    name: 'a non-integer triangle index',
+    rig: LIMB_RIG,
+    data: withTriangle([0, 1, 1.5]),
+    message: 'triangle 0 index 1.5 is not a vertex index',
+  },
+  {
+    name: 'a triangle that repeats an index',
+    rig: LIMB_RIG,
+    data: withTriangle([0, 1, 1]),
+    message: 'triangle 0 repeats an index',
+  },
+  {
+    name: 'fewer than 3 vertices',
+    rig: LIMB_RIG,
+    data: { ...LIMB_MESH, vertices: LIMB_MESH.vertices.slice(0, 2), triangles: [[0, 1, 0]] },
+    message: 'has 2 vertices, needs at least 3',
+  },
+  {
+    name: 'no triangles',
+    rig: LIMB_RIG,
+    data: { ...LIMB_MESH, triangles: [] },
+    message: 'has no triangles',
   },
 ];

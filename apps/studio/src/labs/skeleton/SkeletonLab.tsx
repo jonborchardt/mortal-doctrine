@@ -1,18 +1,31 @@
 import { useState } from 'react';
+import { loadMesh, type Mesh } from '@mortal-doctrine/animation';
+import { LIMB_MESH, LIMB_RIG } from '@mortal-doctrine/animation/testing';
 import { apply, degToRad, radToDeg } from '@mortal-doctrine/math';
 import { evaluate, extendRig, loadRig, type Pose, type Rig } from '@mortal-doctrine/rig';
 import { MANNEQUIN_RIG, NON_HUMANOID_RIG, TAIL_EXTENSION } from '@mortal-doctrine/rig/testing';
 import type { Facing } from '@mortal-doctrine/skeleton-renderer';
 import { SkeletonCanvas } from './SkeletonCanvas';
 
+const LIMB = loadRig(LIMB_RIG);
+const NO_MESHES: readonly Mesh[] = [];
+
 const FIXTURES = [
-  { id: 'mannequin', name: 'Mannequin', rig: loadRig(MANNEQUIN_RIG) },
-  { id: 'non-humanoid', name: 'Four arms and wings', rig: loadRig(NON_HUMANOID_RIG) },
+  { id: 'mannequin', name: 'Mannequin', rig: loadRig(MANNEQUIN_RIG), meshes: NO_MESHES },
+  {
+    id: 'non-humanoid',
+    name: 'Four arms and wings',
+    rig: loadRig(NON_HUMANOID_RIG),
+    meshes: NO_MESHES,
+  },
   {
     id: 'mannequin-tail',
     name: 'Mannequin + tail extension',
     rig: loadRig(extendRig(MANNEQUIN_RIG, TAIL_EXTENSION)),
+    meshes: NO_MESHES,
   },
+  // One skinned mesh across both bones: rotating `lower` bends it at the joint.
+  { id: 'mesh-limb', name: 'Mesh limb', rig: LIMB, meshes: [loadMesh(LIMB, LIMB_MESH)] },
 ] as const;
 
 const NONE = '';
@@ -54,7 +67,7 @@ export function SkeletonLab() {
   const [attachments, setAttachments] = useState<Readonly<Record<string, string | null>>>({});
   const [facing, setFacing] = useState<Facing>(1);
 
-  const { rig } = FIXTURES.find((fixture) => fixture.id === fixtureId) ?? FIXTURES[0];
+  const { rig, meshes } = FIXTURES.find((fixture) => fixture.id === fixtureId) ?? FIXTURES[0];
   const reset = () => {
     setDegrees({});
     setAttachments({});
@@ -204,7 +217,7 @@ export function SkeletonLab() {
             );
           })}
         </svg>
-        <SkeletonCanvas rig={rig} pose={pose} facing={facing} />
+        <SkeletonCanvas rig={rig} meshes={meshes} pose={pose} facing={facing} />
         <div className="space-y-4">
           <section aria-labelledby="skeleton-anchors">
             <h2 id="skeleton-anchors" className="mb-1 text-sm text-neutral-400">
