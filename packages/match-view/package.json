@@ -1,0 +1,34 @@
+{
+  "name": "@mortal-doctrine/match-view",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "mortalDoctrine": {
+    "layer": "presentation"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mortal-doctrine/animation": "workspace:*",
+    "@mortal-doctrine/arena": "workspace:*",
+    "@mortal-doctrine/audio": "workspace:*",
+    "@mortal-doctrine/camera": "workspace:*",
+    "@mortal-doctrine/commands": "workspace:*",
+    "@mortal-doctrine/effects": "workspace:*",
+    "@mortal-doctrine/movement": "workspace:*",
+    "@mortal-doctrine/renderer": "workspace:*",
+    "@mortal-doctrine/rig": "workspace:*",
+    "@mortal-doctrine/simulation": "workspace:*",
+    "@mortal-doctrine/skeleton-renderer": "workspace:*"
+  },
+  "devDependencies": {
+    "@mortal-doctrine/sim-core": "workspace:*",
+    "vitest": "^5.1.2"
+  }
+}

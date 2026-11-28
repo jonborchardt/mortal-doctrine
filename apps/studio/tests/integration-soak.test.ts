@@ -1,3 +1,4 @@
+import { SEED, SESSION_OPTIONS } from '@mortal-doctrine/match-view/testing';
 import {
   createReplayPlayer,
   deserializeReplay,
@@ -13,12 +14,7 @@ import {
   type SimulationEvent,
 } from '@mortal-doctrine/simulation';
 import { expect, it } from 'vitest';
-import {
-  createSession,
-  scriptedInputs,
-  SEED,
-  SESSION_OPTIONS,
-} from '../src/labs/integration/session';
+import { createSession, scriptedInputs } from '../src/labs/integration/session';
 
 // Ten simulated minutes at 60 Hz, and a little more so the run does not end on a checksum frame.
 const FRAMES = 36_000 + 37;

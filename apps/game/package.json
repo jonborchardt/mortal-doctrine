@@ -13,8 +13,9 @@
     "typecheck": "tsc"
   },
   "dependencies": {
+    "@mortal-doctrine/audio": "workspace:*",
     "@mortal-doctrine/input": "workspace:*",
-    "@mortal-doctrine/renderer": "workspace:*",
+    "@mortal-doctrine/match-view": "workspace:*",
     "@mortal-doctrine/sim-core": "workspace:*",
     "@mortal-doctrine/simulation": "workspace:*",
     "react": "^19.3.1",

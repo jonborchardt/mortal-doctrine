@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { createInputCapture, DEFAULT_PLAYER_BINDINGS } from '@mortal-doctrine/input';
-import { SUBUNITS_PER_UNIT } from '@mortal-doctrine/sim-core';
 
 export function App() {
   const hostRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLSpanElement>(null);
   const fpsRef = useRef<HTMLSpanElement>(null);
   const p1Ref = useRef<HTMLSpanElement>(null);
+  const effectsRef = useRef<HTMLSpanElement>(null);
+  const cuesRef = useRef<HTMLSpanElement>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -14,34 +14,29 @@ export function App() {
     if (!host) return;
     let disposed = false;
     let teardown = () => {};
+    const fail = (cause: unknown) => {
+      console.error(cause);
+      if (!disposed) setError(String(cause));
+    };
 
-    // Loaded lazily so PixiJS ships as its own chunk and the page shell paints first.
-    import('@mortal-doctrine/renderer')
-      .then(({ startHostLoop }) => {
+    // Loaded lazily so PixiJS ships as its own chunk and the page shell paints first. The
+    // per-frame loop lives in `match.ts`, outside React: HUD text is written directly.
+    import('./match')
+      .then(({ startMatch }) => {
         if (disposed) return;
-        const p1 = createInputCapture(DEFAULT_PLAYER_BINDINGS[0]);
-        const p2 = createInputCapture(DEFAULT_PLAYER_BINDINGS[1]);
-        // The per-frame loop lives outside React: HUD text is written directly, never via state.
-        const loop = startHostLoop(host, {
-          // Sampled once per simulation tick, so taps shorter than a tick are not lost.
-          inputs: () => [p1.sample(), p2.sample()],
-          onFrame: ({ state }) => {
-            setText(frameRef.current, String(state.frame));
-            setText(fpsRef.current, String(Math.round(loop.renderer?.fps ?? 0)));
-            setText(p1Ref.current, String(state.fighters[0].x / SUBUNITS_PER_UNIT));
+        teardown = startMatch(
+          host,
+          {
+            frame: frameRef.current,
+            fps: fpsRef.current,
+            p1x: p1Ref.current,
+            effects: effectsRef.current,
+            cues: cuesRef.current,
           },
-        });
-        teardown = () => {
-          loop.destroy();
-          p1.dispose();
-          p2.dispose();
-        };
-        return loop.ready;
+          fail,
+        );
       })
-      .catch((cause: unknown) => {
-        console.error(cause);
-        setError(String(cause));
-      });
+      .catch(fail);
 
     return () => {
       disposed = true;
@@ -62,16 +57,25 @@ export function App() {
         <span>
           P1 x <span data-testid="p1-x" ref={p1Ref} />
         </span>
+        <span>
+          Effects <span data-testid="effects-spawned" ref={effectsRef} />
+        </span>
+        <span>
+          Cues <span data-testid="audio-cues" ref={cuesRef} />
+        </span>
       </div>
-      <div ref={hostRef} data-testid="arena" className="w-full max-w-[960px]" />
+      <div
+        ref={hostRef}
+        data-testid="arena"
+        role="img"
+        aria-label="Two mannequin fighters in the placeholder arena"
+        className="w-full max-w-[960px]"
+      />
       <p className="text-sm text-neutral-400">
-        Player 1: ← → or A / D · Player 2: numpad 4 / 6 or the first gamepad
+        Player 1: A / D or ← → to walk, W or ↑ to jump, S or ↓ to crouch · Player 2: numpad 4 / 6 /
+        8 / 5 or the first gamepad · Sound plays after the first key or pointer press
       </p>
       {error && <p className="text-red-400">Renderer failed: {error}</p>}
     </main>
   );
-}
-
-function setText(element: HTMLElement | null, text: string) {
-  if (element && element.textContent !== text) element.textContent = text;
 }

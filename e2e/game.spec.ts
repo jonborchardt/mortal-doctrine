@@ -1,6 +1,24 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+import { expectColours, type Rgb } from './canvas';
+
+// What the page requested and what went wrong, collected from before the navigation.
+const requested = new WeakMap<Page, string[]>();
+const problems = new WeakMap<Page, string[]>();
 
 test.beforeEach(async ({ page }) => {
+  const urls: string[] = [];
+  const errors: string[] = [];
+  requested.set(page, urls);
+  problems.set(page, errors);
+  page.on('request', (request) => urls.push(request.url()));
+  page.on('requestfailed', (request) => errors.push(`request failed: ${request.url()}`));
+  page.on('response', (response) => {
+    if (response.status() >= 400) errors.push(`HTTP ${response.status()}: ${response.url()}`);
+  });
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text());
+  });
   await page.goto('/');
 });
 
@@ -31,4 +49,64 @@ test('keyboard input moves player one', async ({ page }) => {
   await page.keyboard.down('KeyA');
   await expect.poll(async () => Number(await x.textContent())).toBeLessThan(afterRight);
   await page.keyboard.up('KeyA');
+});
+
+// The placeholder match at rest: the camera shows 800 world units across the 960 px canvas
+// (1.2 px per world unit), centred between the fighters at x = 240 and 720, ground line at
+// y = 460. A mannequin's body attachment is centred 130 world units above its feet.
+const GROUND: Rgb = [120, 84, 56];
+const BODY_PLAIN: Rgb = [0x4f, 0x8f, 0xd9];
+const BACKGROUND: Rgb = [0x15, 0x13, 0x1c];
+const AT_REST = [
+  { point: { x: 480, y: 520 }, colour: GROUND },
+  { point: { x: 192, y: 304 }, colour: BODY_PLAIN },
+  { point: { x: 768, y: 304 }, colour: BODY_PLAIN },
+  { point: { x: 480, y: 304 }, colour: BACKGROUND },
+];
+
+test('draws the arena and both mannequins with live textures, also after a reload', async ({
+  page,
+}, testInfo) => {
+  // The dev server renders in StrictMode: this stage is the second mount, built after the first
+  // one was disposed. Released or missing textures would not draw these colours.
+  await expectColours(page, AT_REST);
+  await expect(page.getByTestId('arena').locator('canvas')).toHaveCount(1);
+  await page.screenshot({ path: testInfo.outputPath('game-screen.png'), fullPage: true });
+
+  await page.reload();
+  await expectColours(page, AT_REST);
+  await expect(page.getByTestId('arena').locator('canvas')).toHaveCount(1);
+});
+
+test('a jump spawns effects and triggers audio cues', async ({ page }) => {
+  const effects = page.getByTestId('effects-spawned');
+  const cues = page.getByTestId('audio-cues');
+  await expect(effects).toHaveText(/\d+/);
+  await expect(cues).toHaveText(/\d+/);
+  const effectsBefore = Number(await effects.textContent());
+  const cuesBefore = Number(await cues.textContent());
+
+  // The key press is also the gesture that unlocks audio.
+  await page.keyboard.down('ArrowUp');
+  await expect.poll(async () => Number(await effects.textContent())).toBeGreaterThan(effectsBefore);
+  await expect.poll(async () => Number(await cues.textContent())).toBeGreaterThan(cuesBefore);
+  await page.keyboard.up('ArrowUp');
+});
+
+test('loads its fixtures from its own origin without failed requests or errors', async ({
+  page,
+  baseURL,
+}) => {
+  // The stage has loaded both manifests and every texture once the frame counter runs.
+  await expect(page.getByTestId('sim-frame')).toHaveText(/\d+/);
+  await expectColours(page, AT_REST);
+  const urls = requested.get(page) ?? [];
+  for (const manifest of ['arena', 'skeleton']) {
+    expect(urls).toContain(new URL(`/fixtures/${manifest}/manifest.json`, baseURL).href);
+  }
+  expect(urls.filter((url) => url.includes('/fixtures/')).length).toBeGreaterThan(2);
+  for (const url of urls.filter((url) => /^https?:/.test(url))) {
+    expect(new URL(url).origin, url).toBe(new URL(baseURL ?? '').origin);
+  }
+  expect(problems.get(page)).toEqual([]);
 });

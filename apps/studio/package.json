@@ -21,6 +21,7 @@
     "@mortal-doctrine/commands": "workspace:*",
     "@mortal-doctrine/effects": "workspace:*",
     "@mortal-doctrine/input": "workspace:*",
+    "@mortal-doctrine/match-view": "workspace:*",
     "@mortal-doctrine/math": "workspace:*",
     "@mortal-doctrine/movement": "workspace:*",
     "@mortal-doctrine/renderer": "workspace:*",

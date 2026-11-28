@@ -1,32 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
-import { createArenaRenderable } from '@mortal-doctrine/arena';
 import { createAudioPlayer, type AudioPlayer } from '@mortal-doctrine/audio';
-import { createToneBuffers, FIXTURE_CUES } from '@mortal-doctrine/audio/testing';
 import { visibleSpan } from '@mortal-doctrine/camera';
-import { createEffectsRenderable } from '@mortal-doctrine/effects';
-import { CORE_EFFECTS, CORE_MAPPING } from '@mortal-doctrine/effects/testing';
 import { createInputCapture, DEFAULT_PLAYER_BINDINGS } from '@mortal-doctrine/input';
-import { createArenaRenderer, loadTextureManifest } from '@mortal-doctrine/renderer';
-import { loadRig } from '@mortal-doctrine/rig';
-import { MANNEQUIN_RIG } from '@mortal-doctrine/rig/testing';
-import { TICK_MS } from '@mortal-doctrine/sim-core';
-import { createSkeletonRenderable } from '@mortal-doctrine/skeleton-renderer';
+import { createPresenter, mountMatchStage, type Tick } from '@mortal-doctrine/match-view';
 import {
-  ARENA,
   CAMERA_CONFIG,
-  createPresenter,
-  createSession,
   fighterActivity,
+  PRESENTATION,
   SEED,
-  type DrawFrame,
-  type FinalFrame,
-  type Session,
-  type Tick,
-} from './session';
+  STAGE,
+  toneAudio,
+} from '@mortal-doctrine/match-view/testing';
+import { TICK_MS } from '@mortal-doctrine/sim-core';
+import { createSession, type FinalFrame, type Session } from './session';
 
-const ARENA_MANIFEST = '/fixtures/arena/manifest.json';
-const SKELETON_MANIFEST = '/fixtures/skeleton/manifest.json';
-const RIG = loadRig(MANNEQUIN_RIG);
 const { viewport } = CAMERA_CONFIG;
 const GESTURES = ['pointerdown', 'keydown'] as const;
 const CUE_LINES = 5;
@@ -55,9 +42,6 @@ export function IntegrationLab() {
   const rootRef = useRef<HTMLElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const actionsRef = useRef<Actions | null>(null);
-  // Tail of the sessions so far: each manifest's URLs have one owner at a time, so a session
-  // starts only after the previous one was torn down (StrictMode mounts twice).
-  const sessions = useRef<Promise<void>>(Promise.resolve());
   const [ready, setReady] = useState(false);
   const [controls, setControls] = useState(INITIAL_CONTROLS);
   const [alert, setAlert] = useState<string | null>(null);
@@ -69,44 +53,12 @@ export function IntegrationLab() {
     if (!host || !root) return;
     let disposed = false;
     let teardown = () => {};
+    const mount = mountMatchStage(host, STAGE);
 
-    sessions.current = sessions.current
-      .then(async () => {
-        if (disposed) return;
-        // No placeholder floor or fighters: the arena and the mannequins are drawn instead.
-        const renderer = await createArenaRenderer(host, { ...viewport, placeholders: false });
-        teardown = () => renderer.destroy();
-        if (disposed) return teardown();
-
-        // On a renderer destroyed meanwhile, `register` destroys the renderable, which releases
-        // the textures it owns.
-        renderer.register(
-          createArenaRenderable({
-            arena: ARENA,
-            textures: await loadTextureManifest(ARENA_MANIFEST),
-            viewportWidth: viewport.width,
-          }),
-        );
-        if (disposed) return;
-        // One manifest has one owner, and both mannequins draw from it: the second renderable
-        // owns the textures, the first borrows them and is destroyed first (ticket #222).
-        const textures = await loadTextureManifest(SKELETON_MANIFEST);
-        const borrowed = { ...textures, release: () => Promise.resolve() };
-        const skeletons = [borrowed, textures].map((owned) => {
-          const skeleton = createSkeletonRenderable({
-            rig: RIG,
-            layer: 'fighters',
-            textures: owned,
-          });
-          renderer.register(skeleton);
-          return skeleton;
-        });
-        if (disposed) return;
-        const effects = createEffectsRenderable({
-          definitions: CORE_EFFECTS,
-          mapping: CORE_MAPPING,
-        });
-        renderer.register(effects);
+    mount.ready
+      .then((stage) => {
+        if (!stage) return;
+        const { renderer, effects } = stage;
 
         const captures = [
           createInputCapture(DEFAULT_PLAYER_BINDINGS[0]),
@@ -127,22 +79,9 @@ export function IntegrationLab() {
         for (const type of GESTURES) window.addEventListener(type, relayGesture);
         const createAudio = () => {
           const context = new AudioContext();
-          const player = createAudioPlayer({
-            context,
-            cues: FIXTURE_CUES,
-            buffers: createToneBuffers(context),
-            gestureTarget: gestures,
-          });
+          const player = createAudioPlayer({ ...toneAudio(context), gestureTarget: gestures });
           if (unlocked) gestures.dispatchEvent(new Event('pointerdown'));
           return player;
-        };
-
-        const draw = ({ state, events, view, poses }: DrawFrame) => {
-          renderer.setView(view);
-          state.fighters.forEach((fighter, index) =>
-            skeletons[index]?.setPose(poses[index] ?? {}, fighter.facing, fighter),
-          );
-          renderer.render(state, { events });
         };
 
         let audio: AudioPlayer | undefined;
@@ -157,7 +96,7 @@ export function IntegrationLab() {
           audio?.dispose();
           audio = createAudio();
           const player = audio;
-          presenter = createPresenter({ audio: player, draw });
+          presenter = createPresenter({ ...PRESENTATION, audio: player, draw: stage.draw });
           effects.clear();
           spawned.clear();
           lastEffect = '—';
@@ -285,7 +224,6 @@ export function IntegrationLab() {
           for (const type of GESTURES) window.removeEventListener(type, relayGesture);
           for (const capture of captures) capture.dispose();
           audio?.dispose();
-          renderer.destroy();
           actionsRef.current = null;
         };
       })
@@ -297,6 +235,7 @@ export function IntegrationLab() {
     return () => {
       disposed = true;
       teardown();
+      mount.dispose();
     };
   }, []);
 
