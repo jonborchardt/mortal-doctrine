@@ -64,13 +64,19 @@ placeholder fighters use it; nothing else is interpolated.
 `loadTextureManifest(manifestUrl, { resolution = 2 })` fetches a `schemaVersion: 1` manifest
 (`docs/content-conventions.md`), validates it and loads every texture through Pixi `Assets` at
 `resolution` (a 192×64 px file is 96×32 logical px at 2×). It resolves to
-`{ textures, urls, release }` keyed by texture id; `release()` unloads them from Pixi's asset
-cache and destroys them. A failed texture rejects with its id and URL, after releasing the rest.
+`{ textures, urls, release }` keyed by texture id. A failed texture rejects with its id and URL,
+after releasing the rest.
 `parseTextureManifest(json, manifestUrl)` is the Pixi-free validator (relative paths, forward
 slashes, no `..` segment, plain or percent-encoded, unknown versions rejected; errors name the field or texture id) returning
-id → absolute URL. One live load per URL at a time: Pixi caches one texture per URL with no reference count, so
-the first `release()` destroys it for every holder. Give each URL a single owner; a new load
-waits for that URL's pending release.
+id → absolute URL.
+
+Every call returns its own handle, and several handles may hold the same URL: Pixi caches one
+texture per URL with no reference count, so the loader counts the live handles per URL. They
+share one `Texture` object; `release()` (idempotent) gives one handle back, and a URL is unloaded
+from Pixi's asset cache and destroyed when its last handle is released, in any order. Because
+there is one texture per URL, loading a URL that a live handle holds at a different `resolution`
+rejects, naming the URL and both resolutions. After the last release a new load waits for that
+URL's pending unload and uses its own `resolution`.
 
 ## Host loop
 
@@ -103,7 +109,9 @@ Other exports: `ArenaRenderer.onFrame(cb)` (display-frame callback, returns unsu
 ## Tests
 
 `pnpm --filter @mortal-doctrine/renderer test` (Vitest, Node) covers the view transform, blend
-and manifest parser. Tests import only the public entry `../src/index.ts`: PixiJS v8 loads in
+and manifest parser, and (`tests/texture-sharing.test.ts`, with `fetch`, `document` and Pixi
+`Assets` stubbed) the counted texture handles: unload once with the last release, the
+same-resolution rule and failed loads. Tests import only the public entry `../src/index.ts`: PixiJS v8 loads in
 Node as long as no `Application` is created, so no `./testing` entry is needed. Drawing, layers,
 registration, texture loading and teardown need WebGL and are covered by Playwright (`e2e/`)
 through the game and the Simulation Lab (its fixture renderable).

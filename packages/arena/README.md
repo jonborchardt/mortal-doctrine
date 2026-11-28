@@ -70,8 +70,8 @@ All arena layers are mounted, in data order, in one renderer layer. The renderab
 `LoadedTextures` it is given: it releases them on `destroy` (called by unregister or
 `renderer.destroy()`), or at once if the factory throws because an image names a texture id that
 is not loaded (`Arena "<id>": layer "<layer>" has no texture "<texture>"`). `destroy` is
-idempotent. One live owner per manifest URL (renderer rule): unregister before loading the same
-manifest again.
+idempotent. Each renderable needs its own handle from `loadTextureManifest`; handles on the same
+manifest share its textures, which are unloaded with the last release (renderer rule).
 
 ```ts
 import { createArenaRenderable, parseArena } from '@mortal-doctrine/arena';

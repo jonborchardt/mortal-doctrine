@@ -11,7 +11,10 @@ import {
   type LoadedTextures,
 } from '@mortal-doctrine/renderer';
 import type { Rig } from '@mortal-doctrine/rig';
-import { createSkeletonRenderable } from '@mortal-doctrine/skeleton-renderer';
+import {
+  createSkeletonRenderable,
+  type SkeletonRenderable,
+} from '@mortal-doctrine/skeleton-renderer';
 import type { DrawFrame } from './presenter';
 
 export interface MatchStageOptions {
@@ -42,9 +45,9 @@ export interface MatchStageMount {
   dispose(): void;
 }
 
-// Tail of the mounts so far. A texture manifest's URLs have one owner at a time, so a stage
-// starts only after the previous one was built or abandoned and the textures it loaded were
-// released (React StrictMode mounts twice).
+// Tail of the mounts so far. A stage starts only after the previous one was built or abandoned
+// and the texture releases it started have finished, which keeps a mount, unmount and remount
+// (React StrictMode mounts twice) in order.
 let mounts: Promise<unknown> = Promise.resolve();
 
 /**
@@ -88,15 +91,14 @@ export function mountMatchStage(host: HTMLElement, options: MatchStageOptions): 
       }),
     );
     if (disposed) return undefined;
-    // One manifest has one owner, and both skeletons draw from it: the second renderable owns
-    // the textures, the first borrows them and is destroyed first (ticket #222).
-    const textures = await load(options.skeletonManifest);
-    const borrowed = { ...textures, release: () => Promise.resolve() };
-    const skeletons = [borrowed, textures].map((owned) => {
-      const skeleton = createSkeletonRenderable({ rig, layer: 'fighters', textures: owned });
+    // Each skeleton owns its own handle on the manifest; the textures are unloaded with the last.
+    const skeletons: SkeletonRenderable[] = [];
+    for (let fighter = 0; fighter < 2 && !disposed; fighter += 1) {
+      const textures = await load(options.skeletonManifest);
+      const skeleton = createSkeletonRenderable({ rig, layer: 'fighters', textures });
       created.register(skeleton);
-      return skeleton;
-    });
+      skeletons.push(skeleton);
+    }
     if (disposed) return undefined;
     const effects = createEffectsRenderable(options.effects);
     created.register(effects);
