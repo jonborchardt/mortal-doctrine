@@ -30,10 +30,12 @@ const isCI = Boolean(process.env.CI);
 export default defineConfig({
   testDir: 'e2e',
   outputDir: 'test-results',
-  // Every worker is a Chromium rendering WebGL in software (SwiftShader) at 60 fps. Measured on
-  // 12 threads: 6 workers (the default, half the cores) ran the suite slower than 3 and starved
-  // tests until 5 s assertions timed out. More than 3 only adds contention.
-  workers: Math.max(1, Math.min(3, Math.floor(availableParallelism() / 2))),
+  // Every worker is a Chromium rendering WebGL in software (SwiftShader) at 60 fps, which needs
+  // about four hardware threads to itself. Measured: on 12 threads, 6 workers ran the suite
+  // slower than 3 and starved tests into timeouts. On 4-core Windows CI runners, 2 workers
+  // stalled whenever two heavy labs (camera and effects) overlapped: 4 of 5 runs failed, while
+  // 1 worker passed 5 of 5 in about the same time.
+  workers: Math.max(1, Math.min(3, Math.floor(availableParallelism() / 4))),
   forbidOnly: isCI,
   reporter: isCI ? [['github'], ['html', { open: 'never' }]] : 'list',
   use: {
