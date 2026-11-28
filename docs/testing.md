@@ -82,3 +82,7 @@ tolerance — not pixel-perfect full-page snapshots. None exist yet.
 GitHub Actions runs `pnpm check` and `pnpm test:e2e` on Ubuntu and Windows with a frozen
 lockfile; Playwright reports and traces are uploaded on failure. Headless Chromium uses
 SwiftShader for WebGL (`--enable-unsafe-swiftshader`).
+
+Failure traces keep DOM snapshots, the action log, console, network and a final screenshot, but
+no screencast (its per-frame readbacks loaded slow runners); rerun with `--trace on` for a film
+strip.
